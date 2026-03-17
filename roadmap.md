@@ -6,7 +6,7 @@
 - [ ] Built-in web UI authentication (before relying solely on reverse proxy)
 - [ ] CSRF protection on all state-changing form actions
 - [ ] Per-server known_hosts verification (opt-in, with UI warning when disabled)
-- [ ] Sanitise log snippets before sending to Discord (strip common secret patterns)
+- [ ] Secret redaction filter for outbound Discord content — scrub common patterns (API keys, tokens, passwords) from log snippets and alert reasons before they leave the network
 
 ## Hardening / correctness
 
