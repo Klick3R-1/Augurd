@@ -58,9 +58,11 @@ async def dashboard(request: Request):
 
 @app.get("/servers/new", response_class=HTMLResponse)
 async def server_new(request: Request):
+    settings = await database.get_settings()
+    models = await ollama_client.get_models(settings.get("ollama_url", "http://localhost:11434"))
     return templates.TemplateResponse(
         "server_form.html",
-        {"request": request, "server": None, "log_sources": [], "errors": []},
+        {"request": request, "server": None, "log_sources": [], "models": models, "errors": []},
     )
 
 
@@ -71,8 +73,13 @@ async def server_create(
     port: int = Form(22),
     username: str = Form(...),
     ssh_key_path: str = Form(""),
+    ssh_key_content: str = Form(""),
     ssh_password: str = Form(""),
     force_password_auth: str = Form(""),
+    proxy_command: str = Form(""),
+    show_reasoning: str = Form(""),
+    model_override: str = Form(""),
+    prompt_override: str = Form(""),
 ):
     server_id = await database.create_server(
         name=name,
@@ -80,8 +87,13 @@ async def server_create(
         port=port,
         username=username,
         ssh_key_path=ssh_key_path.strip() or None,
+        ssh_key_content=ssh_key_content.strip() or None,
         ssh_password=ssh_password.strip() or None,
         force_password_auth=bool(force_password_auth),
+        proxy_command=proxy_command.strip() or None,
+        show_reasoning=bool(show_reasoning),
+        model_override=model_override.strip() or None,
+        prompt_override=prompt_override.strip() or None,
     )
     return redirect(f"/servers/{server_id}")
 
@@ -94,6 +106,8 @@ async def server_detail(request: Request, server_id: int):
     log_sources = await database.get_log_sources(server_id)
     alerts = await database.get_server_alerts(server_id, limit=20)
     status = worker_manager.get_status(server_id)
+    settings = await database.get_settings()
+    models = await ollama_client.get_models(settings.get("ollama_url", "http://localhost:11434"))
     return templates.TemplateResponse(
         "server_form.html",
         {
@@ -102,6 +116,7 @@ async def server_detail(request: Request, server_id: int):
             "log_sources": log_sources,
             "alerts": alerts,
             "worker": status,
+            "models": models,
             "errors": [],
         },
     )
@@ -115,8 +130,13 @@ async def server_update(
     port: int = Form(22),
     username: str = Form(...),
     ssh_key_path: str = Form(""),
+    ssh_key_content: str = Form(""),
     ssh_password: str = Form(""),
     force_password_auth: str = Form(""),
+    proxy_command: str = Form(""),
+    show_reasoning: str = Form(""),
+    model_override: str = Form(""),
+    prompt_override: str = Form(""),
 ):
     await database.update_server(
         server_id=server_id,
@@ -125,8 +145,13 @@ async def server_update(
         port=port,
         username=username,
         ssh_key_path=ssh_key_path.strip() or None,
+        ssh_key_content=ssh_key_content.strip() or None,
         ssh_password=ssh_password.strip() or None,
         force_password_auth=bool(force_password_auth),
+        proxy_command=proxy_command.strip() or None,
+        show_reasoning=bool(show_reasoning),
+        model_override=model_override.strip() or None,
+        prompt_override=prompt_override.strip() or None,
     )
     # Restart worker if running so it picks up new connection details
     if worker_manager.get_status(server_id)["status"] == "running":
@@ -221,6 +246,7 @@ async def settings_save(
     buffer_lines: str = Form("20"),
     buffer_seconds: str = Form("30"),
     alert_cooldown_minutes: str = Form("5"),
+    analysis_prompt: str = Form(""),
 ):
     await database.update_settings({
         "discord_webhook_url": discord_webhook_url.strip(),
@@ -229,5 +255,6 @@ async def settings_save(
         "buffer_lines": buffer_lines.strip(),
         "buffer_seconds": buffer_seconds.strip(),
         "alert_cooldown_minutes": alert_cooldown_minutes.strip(),
+        "analysis_prompt": analysis_prompt.strip(),
     })
     return redirect("/settings")

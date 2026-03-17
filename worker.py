@@ -1,6 +1,8 @@
 import asyncio
 import asyncssh
 import logging
+import shlex
+import socket
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -27,6 +29,7 @@ class ServerWorker:
         self.error: Optional[str] = None
         self.last_alert: Optional[datetime] = None
         self.alert_count = 0
+        self.auth_url: Optional[str] = None  # Proxy auth URL (e.g. cloudflared browser auth)
 
     def is_running(self) -> bool:
         return self._task is not None and not self._task.done()
@@ -81,32 +84,85 @@ class ServerWorker:
         }
 
         key_path = self.server.get("ssh_key_path")
+        key_content = self.server.get("ssh_key_content")
         password = self.server.get("ssh_password")
         force_password = bool(self.server.get("force_password_auth", 0))
+        proxy_command = self.server.get("proxy_command")
 
         if force_password:
-            # Skip SSH agent and all keys — password only (pssh mode)
             connect_kwargs["agent_path"] = None
             connect_kwargs["client_keys"] = []
+            connect_kwargs["preferred_auth"] = "password"
             if password:
                 connect_kwargs["password"] = password
         else:
-            if key_path:
+            if key_content:
+                # Pasted key — load directly, disable agent to avoid auth failures
+                connect_kwargs["client_keys"] = [asyncssh.import_private_key(key_content)]
+                connect_kwargs["agent_path"] = None
+            elif key_path:
+                # File path key — disable agent to avoid auth failures from trying all agent keys
                 connect_kwargs["client_keys"] = [str(Path(key_path).expanduser())]
+                connect_kwargs["agent_path"] = None
             if password:
                 connect_kwargs["password"] = password
+
+        proxy_proc = None
+        stderr_task = None
+        proxy_sock = None
+        if proxy_command:
+            cmd = proxy_command.replace("%h", self.server["host"]).replace("%p", str(self.server["port"]))
+            # socketpair: proxy_sock ↔ child_sock
+            # asyncssh gets proxy_sock (a real socket); subprocess gets child_sock as its stdin/stdout
+            proxy_sock, child_sock = socket.socketpair()
+            proxy_sock.setblocking(False)
+            proxy_proc = await asyncio.create_subprocess_exec(
+                *shlex.split(cmd),
+                stdin=child_sock.fileno(),
+                stdout=child_sock.fileno(),
+                stderr=asyncio.subprocess.PIPE,
+            )
+            child_sock.close()  # subprocess has it now, we no longer need it
+            connect_kwargs["sock"] = proxy_sock
+            connect_kwargs.pop("port", None)
+            stderr_task = asyncio.create_task(self._read_proxy_stderr(proxy_proc))
 
         active_sources = [s for s in self.log_sources if s["enabled"]]
         if not active_sources:
             logger.info(f"[{self.server['name']}] No active log sources, worker idle")
+            if proxy_proc:
+                proxy_proc.terminate()
             await self._stop_event.wait()
             return
 
-        async with asyncssh.connect(**connect_kwargs) as conn:
-            self.status = "running"
-            self.error = None
-            logger.info(f"[{self.server['name']}] SSH connected, monitoring {len(active_sources)} source(s)")
-            await asyncio.gather(*[self._monitor_source(conn, src) for src in active_sources])
+        try:
+            async with asyncssh.connect(**connect_kwargs) as conn:
+                self.auth_url = None  # Authenticated — clear the URL
+                self.status = "running"
+                self.error = None
+                logger.info(f"[{self.server['name']}] SSH connected, monitoring {len(active_sources)} source(s)")
+                await asyncio.gather(*[self._monitor_source(conn, src) for src in active_sources])
+        finally:
+            if stderr_task:
+                stderr_task.cancel()
+            if proxy_proc:
+                proxy_proc.terminate()
+                await proxy_proc.wait()
+            if proxy_sock:
+                proxy_sock.close()
+
+    async def _read_proxy_stderr(self, proc: asyncio.subprocess.Process):
+        """Read proxy process stderr, surface any auth URLs."""
+        async for line in proc.stderr:
+            line = line.decode().strip()
+            if not line:
+                continue
+            logger.info(f"[{self.server['name']}] proxy stderr: {line}")
+            # Pick out the auth URL — cloudflared prints it on its own line
+            if line.startswith("https://"):
+                self.auth_url = line
+                self.status = "auth_required"
+                logger.warning(f"[{self.server['name']}] Auth required — open in browser: {line}")
 
     async def _monitor_source(self, conn: asyncssh.SSHClientConnection, source: dict):
         if source["type"] == "journalctl":
@@ -153,15 +209,19 @@ class ServerWorker:
         if self.last_alert and (datetime.now() - self.last_alert).total_seconds() < cooldown:
             return
 
-        ollama_url = self.settings.get("ollama_url", "http://localhost:11434")
-        model = self.settings.get("ollama_model", "llama3.2")
+        # Re-read settings on every flush so prompt/model changes take effect without restart
+        live_settings = await database.get_settings()
+        ollama_url = live_settings.get("ollama_url", "http://localhost:11434")
+        model = self.server.get("model_override") or live_settings.get("ollama_model", "llama3.2")
+        prompt_template = self.server.get("prompt_override") or live_settings.get("analysis_prompt") or None
 
-        is_alert, reason = await ollama_client.analyze_logs(
+        is_alert, reason, reasoning = await ollama_client.analyze_logs(
             ollama_url=ollama_url,
             model=model,
             server_name=self.server["name"],
             source=source["source"],
             lines=lines,
+            prompt_template=prompt_template,
         )
 
         if not is_alert:
@@ -170,8 +230,11 @@ class ServerWorker:
         self.last_alert = datetime.now()
         self.alert_count += 1
         snippet = "\n".join(lines[-10:])
+        show_reasoning = bool(self.server.get("show_reasoning", 0))
 
         logger.warning(f"[{self.server['name']}] ALERT ({source['source']}): {reason}")
+        if reasoning:
+            logger.info(f"[{self.server['name']}] Reasoning: {reasoning}")
 
         await database.save_alert(
             server_id=self.server["id"],
@@ -182,11 +245,12 @@ class ServerWorker:
         )
 
         await discord_client.send_alert(
-            webhook_url=self.settings.get("discord_webhook_url", ""),
+            webhook_url=live_settings.get("discord_webhook_url", ""),
             server_name=self.server["name"],
             server_host=self.server["host"],
             log_source=source["source"],
             source_type=source["type"],
             reason=reason,
             snippet=lines,
+            reasoning=reasoning if show_reasoning else "",
         )

@@ -59,6 +59,18 @@
     </label>
   </div>
 
+  <hr>
+
+  <h4>Analysis Prompt</h4>
+  <p style="color:var(--pico-muted-color); font-size:0.85rem; margin-top:-0.5rem;">
+    Three placeholders are required: <code>{server_name}</code>, <code>{source}</code>, <code>{log_text}</code>.
+    Add context here to reduce false positives — e.g. tell the model to ignore known-noisy services.
+  </p>
+  <label>
+    <textarea name="analysis_prompt" rows="14"
+              style="font-family: monospace; font-size: 0.82rem; resize: vertical;">{{ settings.analysis_prompt }}</textarea>
+  </label>
+
   <button type="submit" style="margin-top:1rem;">Save Settings</button>
 </form>
 {% endblock %}

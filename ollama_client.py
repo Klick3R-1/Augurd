@@ -34,10 +34,12 @@ async def analyze_logs(
     server_name: str,
     source: str,
     lines: list[str],
-) -> tuple[bool, str]:
+    prompt_template: str | None = None,
+) -> tuple[bool, str, str]:
     """Returns (is_alert, reason). reason is empty string when OK."""
     log_text = "\n".join(lines)
-    prompt = ANALYSIS_PROMPT.format(
+    template = prompt_template or ANALYSIS_PROMPT
+    prompt = template.format(
         server_name=server_name,
         source=source,
         log_text=log_text,
@@ -53,11 +55,21 @@ async def analyze_logs(
                 return False, ""
             result = resp.json().get("response", "").strip()
 
-        if result.upper().startswith("ALERT"):
-            reason = result[6:].lstrip(": ").strip() if len(result) > 6 else result
-            return True, reason
+        logger.info(f"Ollama raw response [{server_name}/{source}]: {result}")
 
-        return False, ""
+        if result.upper().startswith("ALERT"):
+            body = result[6:].lstrip(": ").strip() if len(result) > 6 else result
+            # Split off Reasoning: line if present
+            reasoning = ""
+            if "\nReasoning:" in body:
+                parts = body.split("\nReasoning:", 1)
+                reason = parts[0].strip()
+                reasoning = parts[1].strip()
+            else:
+                reason = body
+            return True, reason, reasoning
+
+        return False, "", ""
     except Exception as e:
         logger.error(f"Ollama analysis error: {e}")
         return False, ""

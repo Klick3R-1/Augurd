@@ -46,8 +46,20 @@
         </label>
       </div>
       <label>
-        SSH Key Path <small>(optional)</small>
+        Proxy Command <small>(optional — use %h for hostname, %p for port)</small>
+        <input type="text" name="proxy_command"
+               value="{{ server.proxy_command if server and server.proxy_command else '' }}"
+               placeholder="cloudflared access ssh --hostname %h">
+      </label>
+      <label>
+        SSH Key Path <small>(optional — path on this machine)</small>
         <input type="text" name="ssh_key_path" value="{{ server.ssh_key_path if server and server.ssh_key_path else '' }}" placeholder="~/.ssh/id_ed25519">
+      </label>
+      <label>
+        SSH Key <small>(optional — paste private key directly, takes priority over path)</small>
+        <textarea name="ssh_key_content" rows="4"
+                  style="font-family:monospace; font-size:0.78rem; resize:vertical;"
+                  placeholder="-----BEGIN OPENSSH PRIVATE KEY-----">{% if server and server.ssh_key_content %}{{ server.ssh_key_content }}{% endif %}</textarea>
       </label>
       <label>
         SSH Password <small>(optional, leave blank to keep existing)</small>
@@ -59,6 +71,37 @@
                style="width:auto; margin:0;">
         Use pssh (password auth, skip SSH agent &amp; keys)
       </label>
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input type="checkbox" name="show_reasoning" value="1" role="switch"
+               {% if server and server.show_reasoning %}checked{% endif %}
+               style="width:auto; margin:0;">
+        Show reasoning in Discord alerts
+      </label>
+
+      <hr>
+      <h5 style="margin-bottom:0.5rem;">Overrides <small style="font-weight:normal; color:var(--pico-muted-color);">— leave blank to use global settings</small></h5>
+      <label>
+        Model override
+        {% if models %}
+        <select name="model_override">
+          <option value="">— use global model —</option>
+          {% for m in models %}
+          <option value="{{ m }}" {% if server and server.model_override == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input type="text" name="model_override"
+               value="{{ server.model_override if server and server.model_override else '' }}"
+               placeholder="Could not reach Ollama — enter model name manually">
+        {% endif %}
+      </label>
+      <label>
+        Prompt override
+        <textarea name="prompt_override" rows="10"
+                  style="font-family:monospace; font-size:0.82rem; resize:vertical;"
+                  placeholder="Leave blank to use the global prompt. Required placeholders: {server_name} {source} {log_text}">{{ server.prompt_override if server and server.prompt_override else '' }}</textarea>
+      </label>
+
       <button type="submit">{% if server %}Save Changes{% else %}Create Server{% endif %}</button>
     </form>
   </div>

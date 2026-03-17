@@ -13,6 +13,7 @@ async def send_alert(
     source_type: str,
     reason: str,
     snippet: list[str],
+    reasoning: str = "",
 ):
     if not webhook_url:
         logger.warning("Discord webhook URL not configured, skipping alert")
@@ -31,6 +32,10 @@ async def send_alert(
             {"name": "Source", "value": f"`{log_source}`", "inline": True},
             {"name": "Type", "value": source_type, "inline": True},
             {"name": "Reason", "value": reason, "inline": False},
+            *(
+                [{"name": "Reasoning", "value": reasoning, "inline": False}]
+                if reasoning else []
+            ),
             {
                 "name": "Log Snippet",
                 "value": f"```\n{snippet_text}\n```",

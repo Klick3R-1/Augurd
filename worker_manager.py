@@ -64,6 +64,7 @@ def get_status(server_id: int) -> dict:
         "error": worker.error,
         "last_alert": worker.last_alert.isoformat() if worker.last_alert else None,
         "alert_count": worker.alert_count,
+        "auth_url": worker.auth_url,
     }
 
 

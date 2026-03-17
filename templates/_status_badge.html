@@ -9,4 +9,7 @@
   {% if worker.error and s == 'error' %}
     &mdash; <span class="error-text" title="{{ worker.error }}">{{ worker.error[:60] }}{% if worker.error|length > 60 %}…{% endif %}</span>
   {% endif %}
+  {% if s == 'auth_required' and worker.auth_url %}
+    &mdash; <a href="{{ worker.auth_url }}" target="_blank" style="color:#a855f7;">Open auth URL</a>
+  {% endif %}
 </span>
