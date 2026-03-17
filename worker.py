@@ -30,6 +30,7 @@ class ServerWorker:
         self.last_alert: Optional[datetime] = None
         self.alert_count = 0
         self.auth_url: Optional[str] = None  # Proxy auth URL (e.g. cloudflared browser auth)
+        self._blacklist: list[dict] = []
 
     def is_running(self) -> bool:
         return self._task is not None and not self._task.done()
@@ -106,6 +107,9 @@ class ServerWorker:
                 connect_kwargs["agent_path"] = None
             if password:
                 connect_kwargs["password"] = password
+
+        # Load blacklist for this connection
+        self._blacklist = await database.get_blacklist(self.server["id"])
 
         proxy_proc = None
         stderr_task = None
@@ -189,7 +193,7 @@ class ServerWorker:
                         # EOF — process ended
                         break
                     line = line.rstrip("\n")
-                    if line:
+                    if line and not self._is_blacklisted(line):
                         buffer.append(line)
                     if len(buffer) >= buffer_lines:
                         await self._flush(buffer.copy(), source)
@@ -204,12 +208,24 @@ class ServerWorker:
         if buffer:
             await self._flush(buffer, source)
 
+    def _is_blacklisted(self, line: str) -> bool:
+        """Return True if ALL terms of any blacklist entry appear in the line."""
+        lower = line.lower()
+        for entry in self._blacklist:
+            if not entry["enabled"]:
+                continue
+            terms = [t.strip().lower() for t in entry["terms"].split(",") if t.strip()]
+            if terms and all(t in lower for t in terms):
+                return True
+        return False
+
     async def _flush(self, lines: list[str], source: dict):
         cooldown = int(self.settings.get("alert_cooldown_minutes", 5)) * 60
         if self.last_alert and (datetime.now() - self.last_alert).total_seconds() < cooldown:
             return
 
-        # Re-read settings on every flush so prompt/model changes take effect without restart
+        # Refresh blacklist and settings on every flush — changes take effect without restart
+        self._blacklist = await database.get_blacklist(self.server["id"])
         live_settings = await database.get_settings()
         ollama_url = live_settings.get("ollama_url", "http://localhost:11434")
         model = self.server.get("model_override") or live_settings.get("ollama_model", "llama3.2")

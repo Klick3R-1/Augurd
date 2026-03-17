@@ -151,6 +151,49 @@
       </label>
       <button type="submit" class="btn-sm">Add</button>
     </form>
+
+    <hr>
+    <h4>Blacklist</h4>
+    <p style="color:var(--pico-muted-color); font-size:0.8rem; margin-top:-0.25rem;">
+      Lines matching ALL terms in an entry are dropped before reaching Ollama.
+    </p>
+
+    {% if blacklist %}
+    <table>
+      <thead>
+        <tr><th>Terms (all must match)</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for entry in blacklist %}
+        <tr>
+          <td>
+            {% for term in entry.terms.split(',') %}
+            <code style="font-size:0.78rem; margin-right:0.3rem;">{{ term.strip() }}</code>
+            {% endfor %}
+          </td>
+          <td>
+            <form method="post" action="/servers/{{ server.id }}/blacklist/{{ entry.id }}/delete" style="margin:0;"
+                  onsubmit="return confirm('Remove this blacklist entry?')">
+              <button type="submit" class="btn-sm secondary outline">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--pico-muted-color); font-size:0.9rem;">No blacklist entries yet.</p>
+    {% endif %}
+
+    <h5 style="margin-top:1.5rem;">Add Entry</h5>
+    <form method="post" action="/servers/{{ server.id }}/blacklist">
+      <label>
+        Terms <small>(comma-separated, ALL must appear in a line to drop it)</small>
+        <input type="text" name="terms" required
+               placeholder="e.g. QPainter, flameshot">
+      </label>
+      <button type="submit" class="btn-sm">Add</button>
+    </form>
   </div>
 
   {% endif %}

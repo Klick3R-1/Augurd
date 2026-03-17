@@ -21,6 +21,14 @@ CREATE TABLE IF NOT EXISTS servers (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS blacklist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id INTEGER NOT NULL,
+    terms TEXT NOT NULL,
+    enabled INTEGER DEFAULT 1,
+    FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS log_sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     server_id INTEGER NOT NULL,
@@ -178,6 +186,33 @@ async def toggle_log_source(source_id: int, enabled: bool):
 async def delete_log_source(source_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM log_sources WHERE id = ?", (source_id,))
+        await db.commit()
+
+
+# --- Blacklist ---
+
+async def get_blacklist(server_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM blacklist WHERE server_id = ? ORDER BY id", (server_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def add_blacklist_entry(server_id: int, terms: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO blacklist (server_id, terms) VALUES (?, ?)",
+            (server_id, terms.strip()),
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def delete_blacklist_entry(entry_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM blacklist WHERE id = ?", (entry_id,))
         await db.commit()
 
 

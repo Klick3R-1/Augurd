@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import database
@@ -21,6 +22,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="augurd", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
@@ -62,7 +64,7 @@ async def server_new(request: Request):
     models = await ollama_client.get_models(settings.get("ollama_url", "http://localhost:11434"))
     return templates.TemplateResponse(
         "server_form.html",
-        {"request": request, "server": None, "log_sources": [], "models": models, "errors": []},
+        {"request": request, "server": None, "log_sources": [], "blacklist": [], "models": models, "errors": []},
     )
 
 
@@ -104,6 +106,7 @@ async def server_detail(request: Request, server_id: int):
     if not server:
         return redirect("/")
     log_sources = await database.get_log_sources(server_id)
+    blacklist = await database.get_blacklist(server_id)
     alerts = await database.get_server_alerts(server_id, limit=20)
     status = worker_manager.get_status(server_id)
     settings = await database.get_settings()
@@ -114,6 +117,7 @@ async def server_detail(request: Request, server_id: int):
             "request": request,
             "server": server,
             "log_sources": log_sources,
+            "blacklist": blacklist,
             "alerts": alerts,
             "worker": status,
             "models": models,
@@ -195,6 +199,22 @@ async def log_source_delete(server_id: int, source_id: int):
     if worker_manager.get_status(server_id)["status"] == "running":
         await worker_manager.stop_worker(server_id)
         await worker_manager.start_worker(server_id)
+    return redirect(f"/servers/{server_id}")
+
+
+# ---------------------------------------------------------------------------
+# Blacklist
+# ---------------------------------------------------------------------------
+
+@app.post("/servers/{server_id}/blacklist")
+async def blacklist_add(server_id: int, terms: str = Form(...)):
+    await database.add_blacklist_entry(server_id=server_id, terms=terms)
+    return redirect(f"/servers/{server_id}")
+
+
+@app.post("/servers/{server_id}/blacklist/{entry_id}/delete")
+async def blacklist_delete(server_id: int, entry_id: int):
+    await database.delete_blacklist_entry(entry_id)
     return redirect(f"/servers/{server_id}")
 
 

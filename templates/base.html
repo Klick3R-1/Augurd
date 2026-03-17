@@ -5,44 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}augurd{% endblock %}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/static/style.css">
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-  <style>
-    :root { --font-size: 15px; }
-    nav { padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--pico-muted-border-color); }
-    nav .brand { font-weight: 700; font-size: 1.1rem; text-decoration: none; color: var(--pico-primary); }
-    nav .nav-links { display: flex; gap: 1rem; align-items: center; }
-    nav .nav-links a { color: var(--pico-muted-color); text-decoration: none; font-size: 0.9rem; }
-    nav .nav-links a:hover { color: var(--pico-color); }
-    main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
-
-    .status-dot {
-      display: inline-block;
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      margin-right: 6px;
-    }
-    .status-running    { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
-    .status-connecting,
-    .status-reconnecting { background: #f59e0b; box-shadow: 0 0 6px #f59e0b88; }
-    .status-error      { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
-    .status-auth_required { background: #a855f7; box-shadow: 0 0 6px #a855f788; }
-    .status-stopped    { background: #6b7280; }
-
-    .status-badge { display: inline-flex; align-items: center; font-size: 0.85rem; }
-
-    table { font-size: 0.9rem; }
-    .actions { display: flex; gap: 0.5rem; }
-    .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8rem; }
-    .alert-row td:first-child { color: var(--pico-muted-color); font-size: 0.8rem; white-space: nowrap; }
-    .snippet { font-size: 0.75rem; color: var(--pico-muted-color); font-family: monospace; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .error-text { color: #ef4444; font-size: 0.8rem; }
-  </style>
 </head>
 <body>
   <nav>
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <a class="brand" href="/">&#9656; augurd</a>
-        <span style="font-size:0.75rem; color:var(--pico-muted-color); font-weight:normal; margin-left:0.5rem;">AI-powered log monitor</span>
+    <div style="display:flex; flex-direction:column; gap:0.25rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <a class="brand" href="/">&#9656; augurd</a>
+        <span class="brand-sub">AI-powered log monitor</span>
+      </div>
       <div class="nav-links">
         <a href="/">Dashboard</a>
         <a href="/settings">Settings</a>
