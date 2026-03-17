@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     await worker_manager.stop_all()
 
 
-app = FastAPI(title="localmon", lifespan=lifespan)
+app = FastAPI(title="augurd", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
 

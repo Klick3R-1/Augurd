@@ -1,7 +1,7 @@
 import aiosqlite
 from pathlib import Path
 
-DB_PATH = Path("localmon.db")
+DB_PATH = Path("augurd.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS servers (

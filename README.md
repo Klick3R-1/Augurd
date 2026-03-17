@@ -1,4 +1,4 @@
-# localmon
+# augurd
 
 A self-hosted log monitoring tool that tails logs from remote servers via SSH, analyses them with a local [Ollama](https://ollama.com) instance, and sends alerts to Discord via webhook.
 
@@ -29,8 +29,8 @@ A self-hosted log monitoring tool that tails logs from remote servers via SSH, a
 ## Setup
 
 ```bash
-git clone https://github.com/yourname/localmon
-cd localmon
+git clone https://github.com/yourname/augurd
+cd augurd
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
@@ -41,11 +41,11 @@ Open `http://localhost:8000` and:
 1. **Settings** — set your Ollama URL, pick a model, paste your Discord webhook URL
 2. **Add Server** — fill in SSH connection details
 3. **Add log sources** — `journalctl` unit name (e.g. `sshd.service`), `*` for all system logs, or a file path
-4. **Start Worker** — localmon SSHes in and begins monitoring
+4. **Start Worker** — augurd SSHes in and begins monitoring
 
 ### Ollama
 
-Ollama must be reachable from the machine running localmon. By default Ollama only listens on `127.0.0.1` — to expose it on your network:
+Ollama must be reachable from the machine running augurd. By default Ollama only listens on `127.0.0.1` — to expose it on your network:
 
 ```bash
 # Temporarily
@@ -60,7 +60,7 @@ sudo systemctl edit ollama
 
 ### Reverse proxy (required for external access)
 
-localmon has **no built-in authentication**. It is designed to sit behind [Caddy](https://caddyserver.com) or [Nginx Proxy Manager](https://nginxproxymanager.com) which handle TLS and access control. Do not expose it directly to the internet without a protecting proxy in front.
+augurd has **no built-in authentication**. It is designed to sit behind [Caddy](https://caddyserver.com) or [Nginx Proxy Manager](https://nginxproxymanager.com) which handle TLS and access control. Do not expose it directly to the internet without a protecting proxy in front.
 
 ---
 
@@ -90,7 +90,7 @@ Supports arbitrary proxy commands using `%h` (hostname) and `%p` (port) placehol
 cloudflared access ssh --hostname %h
 ```
 
-When the proxy command outputs a browser authentication URL, localmon surfaces it as a clickable link in the UI.
+When the proxy command outputs a browser authentication URL, augurd surfaces it as a clickable link in the UI.
 
 ---
 
@@ -123,10 +123,10 @@ This is an early project and several security concerns are known. They will be a
 ### Known issues being worked on
 
 **Secrets stored plaintext in SQLite**
-SSH private keys (pasted), SSH passwords, and the Discord webhook URL are stored as plaintext in `localmon.db`. Anyone with read access to that file has access to those credentials. Encryption at rest is planned.
+SSH private keys (pasted), SSH passwords, and the Discord webhook URL are stored as plaintext in `augurd.db`. Anyone with read access to that file has access to those credentials. Encryption at rest is planned.
 
 **No web UI authentication**
-The UI has no login. Anyone who can reach the port can view all server configs, read credentials, start/stop workers, and change settings. localmon is designed to sit behind a reverse proxy (Caddy, NPM) that enforces authentication — but that is currently the operator's responsibility, not enforced by the app. Built-in auth is planned.
+The UI has no login. Anyone who can reach the port can view all server configs, read credentials, start/stop workers, and change settings. augurd is designed to sit behind a reverse proxy (Caddy, NPM) that enforces authentication — but that is currently the operator's responsibility, not enforced by the app. Built-in auth is planned.
 
 **No CSRF protection**
 State-changing form actions have no CSRF tokens. A malicious page could trigger actions if you are logged in. Middleware is planned.
@@ -147,9 +147,9 @@ A crafted log line could attempt to manipulate the Ollama prompt (e.g. `Ignore p
 
 ### Recommended minimum deployment
 
-- Run localmon on a trusted internal network only
+- Run augurd on a trusted internal network only
 - Put it behind Caddy or NPM with at least HTTP basic auth enabled
-- Restrict `localmon.db` file permissions (`chmod 600 localmon.db`)
+- Restrict `augurd.db` file permissions (`chmod 600 augurd.db`)
 - Use SSH key auth rather than passwords where possible
 
 ---
