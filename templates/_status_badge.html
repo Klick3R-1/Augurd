@@ -1,0 +1,12 @@
+{% set s = worker.status %}
+<span class="status-badge"
+      id="status-badge-{{ server_id }}"
+      hx-get="/api/workers/{{ server_id }}/status"
+      hx-trigger="every 4s"
+      hx-swap="outerHTML">
+  <span class="status-dot status-{{ s }}"></span>
+  {{ s }}
+  {% if worker.error and s == 'error' %}
+    &mdash; <span class="error-text" title="{{ worker.error }}">{{ worker.error[:60] }}{% if worker.error|length > 60 %}…{% endif %}</span>
+  {% endif %}
+</span>

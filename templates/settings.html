@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Settings — localmon{% endblock %}
+
+{% block content %}
+<h2>Settings</h2>
+
+<form method="post" action="/settings" style="max-width:560px;">
+
+  <h4>Discord</h4>
+  <label>
+    Webhook URL
+    <input type="url" name="discord_webhook_url"
+           value="{{ settings.discord_webhook_url }}"
+           placeholder="https://discord.com/api/webhooks/…">
+  </label>
+
+  <hr>
+
+  <h4>Ollama</h4>
+  <label>
+    Ollama URL
+    <input type="url" name="ollama_url"
+           value="{{ settings.ollama_url }}"
+           placeholder="http://localhost:11434">
+  </label>
+  <label>
+    Model
+    {% if models %}
+    <select name="ollama_model">
+      {% for m in models %}
+      <option value="{{ m }}" {% if m == settings.ollama_model %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+    {% else %}
+    <input type="text" name="ollama_model"
+           value="{{ settings.ollama_model }}"
+           placeholder="llama3.2 (could not reach Ollama to list models)">
+    {% endif %}
+  </label>
+
+  <hr>
+
+  <h4>Buffering &amp; Alerts</h4>
+  <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem;">
+    <label>
+      Buffer Lines
+      <input type="number" name="buffer_lines" value="{{ settings.buffer_lines }}" min="1" max="500">
+      <small>Flush after N lines</small>
+    </label>
+    <label>
+      Buffer Seconds
+      <input type="number" name="buffer_seconds" value="{{ settings.buffer_seconds }}" min="5" max="600">
+      <small>Flush after N seconds</small>
+    </label>
+    <label>
+      Cooldown (min)
+      <input type="number" name="alert_cooldown_minutes" value="{{ settings.alert_cooldown_minutes }}" min="0" max="1440">
+      <small>Min time between alerts per server</small>
+    </label>
+  </div>
+
+  <button type="submit" style="margin-top:1rem;">Save Settings</button>
+</form>
+{% endblock %}

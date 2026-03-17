@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — localmon{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+  <h2 style="margin:0;">Servers</h2>
+  <a href="/servers/new" role="button" class="btn-sm">+ Add Server</a>
+</div>
+
+{% if servers %}
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Host</th>
+      <th>Status</th>
+      <th>Sources</th>
+      <th>Alerts</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in servers %}
+    <tr>
+      <td><a href="/servers/{{ s.id }}">{{ s.name }}</a></td>
+      <td><code>{{ s.host }}:{{ s.port }}</code></td>
+      <td>
+        {% set worker = s.worker %}
+        {% set server_id = s.id %}
+        {% include "_status_badge.html" with context %}
+      </td>
+      <td>{{ s.active_source_count }}/{{ s.source_count }}</td>
+      <td>{{ s.worker.alert_count }}</td>
+      <td>
+        <div class="actions">
+          {% if s.worker.status == 'running' or s.worker.status == 'connecting' or s.worker.status == 'reconnecting' %}
+            <form method="post" action="/workers/{{ s.id }}/stop" style="margin:0;">
+              <button type="submit" class="btn-sm secondary">Stop</button>
+            </form>
+          {% else %}
+            <form method="post" action="/workers/{{ s.id }}/start" style="margin:0;">
+              <button type="submit" class="btn-sm">Start</button>
+            </form>
+          {% endif %}
+          <a href="/servers/{{ s.id }}" class="btn-sm outline" role="button">Edit</a>
+          <form method="post" action="/servers/{{ s.id }}/delete" style="margin:0;"
+                onsubmit="return confirm('Delete {{ s.name }}?')">
+            <button type="submit" class="btn-sm secondary outline">Delete</button>
+          </form>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color: var(--pico-muted-color);">No servers configured yet. <a href="/servers/new">Add one.</a></p>
+{% endif %}
+
+<hr>
+
+<h3>Recent Alerts</h3>
+{% if alerts %}
+<table>
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Server</th>
+      <th>Source</th>
+      <th>Reason</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for a in alerts %}
+    <tr class="alert-row">
+      <td>{{ a.triggered_at }}</td>
+      <td>{{ a.server_name }}</td>
+      <td><code>{{ a.log_source }}</code></td>
+      <td>
+        {{ a.reason }}
+        {% if a.log_snippet %}
+        <div class="snippet">{{ a.log_snippet[:200] }}</div>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color: var(--pico-muted-color);">No alerts yet.</p>
+{% endif %}
+{% endblock %}

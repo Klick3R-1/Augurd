@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{% if server %}{{ server.name }}{% else %}New Server{% endif %} — localmon{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+  <h2 style="margin:0;">{% if server %}{{ server.name }}{% else %}New Server{% endif %}</h2>
+  {% if server %}
+  <div style="display:flex; align-items:center; gap:1rem;">
+    {% set server_id = server.id %}
+    {% include "_status_badge.html" with context %}
+    {% if worker.status == 'running' or worker.status == 'connecting' or worker.status == 'reconnecting' %}
+      <form method="post" action="/workers/{{ server.id }}/stop" style="margin:0;">
+        <button type="submit" class="btn-sm secondary">Stop Worker</button>
+      </form>
+    {% else %}
+      <form method="post" action="/workers/{{ server.id }}/start" style="margin:0;">
+        <button type="submit" class="btn-sm">Start Worker</button>
+      </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+
+  <!-- Left: Server config -->
+  <div>
+    <h4>Connection</h4>
+    <form method="post" action="{% if server %}/servers/{{ server.id }}/edit{% else %}/servers{% endif %}">
+      <label>
+        Display Name
+        <input type="text" name="name" value="{{ server.name if server else '' }}" required placeholder="my-laptop">
+      </label>
+      <label>
+        Host
+        <input type="text" name="host" value="{{ server.host if server else '' }}" required placeholder="192.168.1.10 or hostname">
+      </label>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+        <label>
+          Port
+          <input type="number" name="port" value="{{ server.port if server else 22 }}" min="1" max="65535">
+        </label>
+        <label>
+          Username
+          <input type="text" name="username" value="{{ server.username if server else '' }}" required placeholder="root">
+        </label>
+      </div>
+      <label>
+        SSH Key Path <small>(optional)</small>
+        <input type="text" name="ssh_key_path" value="{{ server.ssh_key_path if server and server.ssh_key_path else '' }}" placeholder="~/.ssh/id_ed25519">
+      </label>
+      <label>
+        SSH Password <small>(optional, leave blank to keep existing)</small>
+        <input type="password" name="ssh_password" value="" placeholder="Only set if not using key auth">
+      </label>
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input type="checkbox" name="force_password_auth" value="1" role="switch"
+               {% if server and server.force_password_auth %}checked{% endif %}
+               style="width:auto; margin:0;">
+        Use pssh (password auth, skip SSH agent &amp; keys)
+      </label>
+      <button type="submit">{% if server %}Save Changes{% else %}Create Server{% endif %}</button>
+    </form>
+  </div>
+
+  {% if server %}
+  <!-- Right: Log sources -->
+  <div>
+    <h4>Log Sources</h4>
+
+    {% if log_sources %}
+    <table>
+      <thead>
+        <tr><th>Type</th><th>Source</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for src in log_sources %}
+        <tr>
+          <td><small>{{ src.type }}</small></td>
+          <td><code style="font-size:0.8rem;">{{ src.source }}</code></td>
+          <td>
+            <form method="post" action="/servers/{{ server.id }}/log-sources/{{ src.id }}/delete" style="margin:0;"
+                  onsubmit="return confirm('Remove {{ src.source }}?')">
+              <button type="submit" class="btn-sm secondary outline">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--pico-muted-color); font-size:0.9rem;">No log sources yet.</p>
+    {% endif %}
+
+    <h5 style="margin-top:1.5rem;">Add Source</h5>
+    <form method="post" action="/servers/{{ server.id }}/log-sources">
+      <label>
+        Type
+        <select name="source_type">
+          <option value="journalctl">journalctl unit</option>
+          <option value="file">log file</option>
+        </select>
+      </label>
+      <label>
+        Source
+        <input type="text" name="source" required
+               placeholder="e.g. sshd.service — or * for all logs (journalctl only)">
+      </label>
+      <button type="submit" class="btn-sm">Add</button>
+    </form>
+  </div>
+
+  {% endif %}
+</div>
+
+{% if server and alerts %}
+<hr>
+<h4>Recent Alerts</h4>
+<table>
+  <thead>
+    <tr><th>Time</th><th>Source</th><th>Reason</th></tr>
+  </thead>
+  <tbody>
+    {% for a in alerts %}
+    <tr class="alert-row">
+      <td>{{ a.triggered_at }}</td>
+      <td><code>{{ a.log_source }}</code></td>
+      <td>{{ a.reason }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if not server %}
+<p><a href="/">&#8592; Back</a></p>
+{% endif %}
+
+{% endblock %}
