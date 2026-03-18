@@ -2,18 +2,22 @@
 
 ## Security (priority)
 
+- [ ] SSH host key trust-on-first-use (TOFU) — store fingerprint on first connect, reject if it changes; critical for internet-facing servers (Hetzner etc.)
 - [ ] Encrypt secrets at rest in SQLite (SSH keys, passwords, Discord webhook URL)
 - [ ] Built-in web UI authentication (before relying solely on reverse proxy)
 - [ ] CSRF protection on all state-changing form actions
-- [ ] Per-server known_hosts verification (opt-in, with UI warning when disabled)
 - [ ] Secret redaction filter for outbound Discord content — scrub common patterns (API keys, tokens, passwords) from log snippets and alert reasons before they leave the network
 
 ## Hardening / correctness
 
-- [ ] SSH host key checking is disabled (`known_hosts=None`) — per-server opt-in verification
+- [ ] Prompt injection hardening — public-facing servers can write crafted log lines to manipulate LLM analysis
 - [ ] Per-source alert cooldown — currently cooldown is per-server, not per log source
 - [ ] Worker auto-start on app restart (persist desired running state in DB)
 - [ ] Handle Ollama prompt injection via log lines more robustly
+
+## Hardening / correctness (continued)
+
+- [ ] Shared asyncio semaphore across workers to cap concurrent Ollama calls (prevents pile-up with many servers)
 
 ## Features
 

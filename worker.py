@@ -193,8 +193,11 @@ class ServerWorker:
                         # EOF — process ended
                         break
                     line = line.rstrip("\n")
-                    if line and not self._is_blacklisted(line):
-                        buffer.append(line)
+                    if line:
+                        if self._is_blacklisted(line):
+                            logger.debug(f"[{self.server['name']}] Blacklisted ({source['source']}): {line}")
+                        else:
+                            buffer.append(line)
                     if len(buffer) >= buffer_lines:
                         await self._flush(buffer.copy(), source)
                         buffer.clear()

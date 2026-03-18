@@ -14,6 +14,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 
 
+class _SuppressStatusPolling(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "/api/workers/" not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_SuppressStatusPolling())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await database.init_db()
