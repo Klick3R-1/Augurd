@@ -99,6 +99,8 @@ async def init_db():
             "ALTER TABLE servers ADD COLUMN prompt_override TEXT",
             "ALTER TABLE servers ADD COLUMN show_reasoning INTEGER DEFAULT 0",
             "ALTER TABLE servers ADD COLUMN worker_autostart INTEGER DEFAULT 0",
+            "ALTER TABLE servers ADD COLUMN discord_enabled INTEGER DEFAULT 0",
+            "ALTER TABLE servers ADD COLUMN discord_webhook_url TEXT",
             "ALTER TABLE log_sources ADD COLUMN fetch_interval_minutes INTEGER DEFAULT NULL",
             "ALTER TABLE log_sources ADD COLUMN last_fetched_at TEXT DEFAULT NULL",
         ]:
@@ -151,13 +153,15 @@ async def get_server(server_id: int):
 
 async def create_server(name, host, port, username, ssh_key_path=None, ssh_key_content=None,
                         ssh_password=None, force_password_auth=False, proxy_command=None,
-                        model_override=None, prompt_override=None, show_reasoning=False):
+                        model_override=None, prompt_override=None, show_reasoning=False,
+                        discord_enabled=False):
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
-            "INSERT INTO servers (name, host, port, username, ssh_key_path, ssh_key_content, ssh_password, force_password_auth, proxy_command, model_override, prompt_override, show_reasoning) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO servers (name, host, port, username, ssh_key_path, ssh_key_content, ssh_password, force_password_auth, proxy_command, model_override, prompt_override, show_reasoning, discord_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (name, host, int(port), username, ssh_key_path or None, ssh_key_content or None,
              ssh_password or None, 1 if force_password_auth else 0, proxy_command or None,
-             model_override or None, prompt_override or None, 1 if show_reasoning else 0),
+             model_override or None, prompt_override or None, 1 if show_reasoning else 0,
+             1 if discord_enabled else 0),
         )
         await db.commit()
         return cur.lastrowid
@@ -165,13 +169,26 @@ async def create_server(name, host, port, username, ssh_key_path=None, ssh_key_c
 
 async def update_server(server_id, name, host, port, username, ssh_key_path=None, ssh_key_content=None,
                         ssh_password=None, force_password_auth=False, proxy_command=None,
-                        model_override=None, prompt_override=None, show_reasoning=False):
+                        model_override=None, prompt_override=None, show_reasoning=False,
+                        discord_enabled=True):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "UPDATE servers SET name=?, host=?, port=?, username=?, ssh_key_path=?, ssh_key_content=?, ssh_password=?, force_password_auth=?, proxy_command=?, model_override=?, prompt_override=?, show_reasoning=? WHERE id=?",
+            "UPDATE servers SET name=?, host=?, port=?, username=?, ssh_key_path=?, ssh_key_content=?, ssh_password=?, force_password_auth=?, proxy_command=?, model_override=?, prompt_override=?, show_reasoning=?, discord_enabled=? WHERE id=?",
             (name, host, int(port), username, ssh_key_path or None, ssh_key_content or None,
              ssh_password or None, 1 if force_password_auth else 0, proxy_command or None,
-             model_override or None, prompt_override or None, 1 if show_reasoning else 0, server_id),
+             model_override or None, prompt_override or None, 1 if show_reasoning else 0,
+             1 if discord_enabled else 0, server_id),
+        )
+        await db.commit()
+
+
+async def update_server_notifications(server_id: int, discord_enabled: bool, show_reasoning: bool,
+                                      discord_webhook_url: str | None = None):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE servers SET discord_enabled = ?, show_reasoning = ?, discord_webhook_url = ? WHERE id = ?",
+            (1 if discord_enabled else 0, 1 if show_reasoning else 0,
+             discord_webhook_url or None, server_id),
         )
         await db.commit()
 

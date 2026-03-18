@@ -167,6 +167,7 @@ async def server_create(
     force_password_auth: str = Form(""),
     proxy_command: str = Form(""),
     show_reasoning: str = Form(""),
+    discord_enabled: str = Form(""),
     model_override: str = Form(""),
     prompt_override: str = Form(""),
 ):
@@ -181,6 +182,7 @@ async def server_create(
         force_password_auth=bool(force_password_auth),
         proxy_command=proxy_command.strip() or None,
         show_reasoning=bool(show_reasoning),
+        discord_enabled=bool(discord_enabled),
         model_override=model_override.strip() or None,
         prompt_override=prompt_override.strip() or None,
     )
@@ -228,6 +230,7 @@ async def server_update(
     force_password_auth: str = Form(""),
     proxy_command: str = Form(""),
     show_reasoning: str = Form(""),
+    discord_enabled: str = Form(""),
     model_override: str = Form(""),
     prompt_override: str = Form(""),
 ):
@@ -244,6 +247,7 @@ async def server_update(
         force_password_auth=bool(force_password_auth),
         proxy_command=proxy_command.strip() or None,
         show_reasoning=bool(show_reasoning),
+        discord_enabled=bool(discord_enabled),
         model_override=model_override.strip() or None,
         prompt_override=prompt_override.strip() or None,
     )
@@ -255,6 +259,22 @@ async def server_update(
         await worker_manager.stop_worker(server_id)
         await worker_manager.start_worker(server_id)
     return redirect(f"/servers/{server_id}")
+
+
+@app.post("/servers/{server_id}/notifications")
+async def server_notifications(
+    server_id: int,
+    discord_enabled: str = Form(""),
+    show_reasoning: str = Form(""),
+    discord_webhook_url: str = Form(""),
+):
+    await database.update_server_notifications(
+        server_id=server_id,
+        discord_enabled=bool(discord_enabled),
+        show_reasoning=bool(show_reasoning),
+        discord_webhook_url=discord_webhook_url.strip() or None,
+    )
+    return redirect(f"/servers/{server_id}#notifications")
 
 
 @app.post("/servers/{server_id}/clear-fingerprint")

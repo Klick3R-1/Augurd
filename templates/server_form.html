@@ -21,11 +21,27 @@
   {% endif %}
 </div>
 
-<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+{% if server %}
+<!-- Tabs -->
+<div class="tabs" style="margin-bottom:1.5rem;">
+  <nav style="display:flex; gap:0; border-bottom:1px solid var(--pico-muted-border-color); margin-bottom:1.5rem;">
+    {% for tab in ['Connection','Sources','Blacklist','Notifications','History'] %}
+    <button type="button"
+            class="tab-btn {% if loop.first %}active{% endif %}"
+            onclick="switchTab('{{ tab.lower() }}')"
+            id="tab-btn-{{ tab.lower() }}"
+            style="background:none; border:none; border-bottom:2px solid transparent; padding:0.5rem 1.1rem; cursor:pointer; font-size:0.9rem; color:var(--pico-muted-color); margin-bottom:-1px;">
+      {{ tab }}
+    </button>
+    {% endfor %}
+  </nav>
+</div>
+{% endif %}
 
-  <!-- Left: Server config -->
-  <div>
-    <h4>Connection</h4>
+<!-- Connection tab (also used for new server form) -->
+<div id="tab-connection" class="tab-panel">
+  <h4 {% if server %}style="display:none;"{% endif %}>Connection</h4>
+  <div style="max-width:560px;">
     <form method="post" action="{% if server %}/servers/{{ server.id }}/edit{% else %}/servers{% endif %}">
       <label>
         Display Name
@@ -69,13 +85,7 @@
         <input type="checkbox" name="force_password_auth" value="1" role="switch"
                {% if server and server.force_password_auth %}checked{% endif %}
                style="width:auto; margin:0;">
-        Use pssh (password auth, skip SSH agent &amp; keys)
-      </label>
-      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
-        <input type="checkbox" name="show_reasoning" value="1" role="switch"
-               {% if server and server.show_reasoning %}checked{% endif %}
-               style="width:auto; margin:0;">
-        Show reasoning in Discord alerts
+        Use password auth (skip SSH agent &amp; keys)
       </label>
 
       <hr>
@@ -102,6 +112,10 @@
                   placeholder="Leave blank to use the global prompt. Required placeholders: {server_name} {source} {log_text}">{{ server.prompt_override if server and server.prompt_override else '' }}</textarea>
       </label>
 
+      <!-- Preserve notification settings when saving from this tab -->
+      <input type="hidden" name="show_reasoning" value="{{ '1' if server and server.show_reasoning else '' }}">
+      <input type="hidden" name="discord_enabled" value="{{ '1' if server and server.discord_enabled else '' }}">
+
       <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
         <button type="submit">{% if server %}Save Changes{% else %}Create Server{% endif %}</button>
         <button type="button" class="btn-sm secondary outline"
@@ -116,39 +130,58 @@
       </div>
       <div id="test-conn-result" style="margin-top:0.5rem; min-height:1.2rem;"></div>
     </form>
-  </div>
 
-  {% if server %}
-  <!-- Right: Log sources -->
-  <div>
-    <h4>Log Sources</h4>
-
-    {% if log_sources %}
-    <table>
-      <thead>
-        <tr><th>Type</th><th>Source</th><th>Mode</th><th></th></tr>
-      </thead>
-      <tbody>
-        {% for src in log_sources %}
-        <tr>
-          <td><small>{{ src.type }}</small></td>
-          <td><code style="font-size:0.8rem;">{{ src.source }}</code></td>
-          <td><small>{% if src.fetch_interval_minutes %}every {{ src.fetch_interval_minutes }}m{% else %}stream{% endif %}</small></td>
-          <td>
-            <form method="post" action="/servers/{{ server.id }}/log-sources/{{ src.id }}/delete" style="margin:0;"
-                  onsubmit="return confirm('Remove {{ src.source }}?')">
-              <button type="submit" class="btn-sm secondary outline">Remove</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {% if server %}
+    <hr>
+    <h5>SSH Host Key</h5>
+    {% if fingerprint %}
+    <p style="font-size:0.85rem; color:var(--pico-muted-color);">
+      Trusted fingerprint: <code>{{ fingerprint }}</code>
+    </p>
+    <form method="post" action="/servers/{{ server.id }}/clear-fingerprint"
+          onsubmit="return confirm('Clear the trusted fingerprint? The next connection will re-learn and re-trust the host key.')">
+      <button type="submit" class="btn-sm secondary outline">Clear fingerprint</button>
+    </form>
     {% else %}
-    <p style="color:var(--pico-muted-color); font-size:0.9rem;">No log sources yet.</p>
+    <p style="font-size:0.85rem; color:var(--pico-muted-color);">
+      No fingerprint stored yet — the host key will be trusted and saved on first connection.
+    </p>
     {% endif %}
+    {% endif %}
+  </div>
+</div>
 
-    <h5 style="margin-top:1.5rem;">Add Source</h5>
+{% if server %}
+
+<!-- Sources tab -->
+<div id="tab-sources" class="tab-panel" style="display:none;">
+  {% if log_sources %}
+  <table>
+    <thead>
+      <tr><th>Type</th><th>Source</th><th>Mode</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for src in log_sources %}
+      <tr>
+        <td><small>{{ src.type }}</small></td>
+        <td><code style="font-size:0.8rem;">{{ src.source }}</code></td>
+        <td><small>{% if src.fetch_interval_minutes %}every {{ src.fetch_interval_minutes }}m{% else %}stream{% endif %}</small></td>
+        <td>
+          <form method="post" action="/servers/{{ server.id }}/log-sources/{{ src.id }}/delete" style="margin:0;"
+                onsubmit="return confirm('Remove {{ src.source }}?')">
+            <button type="submit" class="btn-sm secondary outline">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:var(--pico-muted-color); font-size:0.9rem;">No log sources yet.</p>
+  {% endif %}
+
+  <h5 style="margin-top:1.5rem;">Add Source</h5>
+  <div style="max-width:480px;">
     <form method="post" action="/servers/{{ server.id }}/log-sources">
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
         <label>
@@ -186,107 +219,166 @@
       </div>
       <button type="submit" class="btn-sm">Add</button>
     </form>
-    <script>
-      function updateFetchMode() {
-        var t = document.getElementById('source_type_select').value;
-        document.getElementById('fetch_mode_wrap').style.display = t === 'file' ? 'none' : '';
-        if (t === 'file') {
-          document.getElementById('fetch_mode_select').value = 'stream';
-          document.getElementById('interval_wrap').style.display = 'none';
-        }
+  </div>
+  <script>
+    function updateFetchMode() {
+      var t = document.getElementById('source_type_select').value;
+      document.getElementById('fetch_mode_wrap').style.display = t === 'file' ? 'none' : '';
+      if (t === 'file') {
+        document.getElementById('fetch_mode_select').value = 'stream';
+        document.getElementById('interval_wrap').style.display = 'none';
       }
-      function updateInterval() {
-        var m = document.getElementById('fetch_mode_select').value;
-        document.getElementById('interval_wrap').style.display = m === 'timed' ? '' : 'none';
-      }
-    </script>
+    }
+    function updateInterval() {
+      var m = document.getElementById('fetch_mode_select').value;
+      document.getElementById('interval_wrap').style.display = m === 'timed' ? '' : 'none';
+    }
+  </script>
+</div>
 
-    <hr>
-    <h4>Blacklist</h4>
-    <p style="color:var(--pico-muted-color); font-size:0.8rem; margin-top:-0.25rem;">
-      Lines matching ALL terms in an entry are dropped before reaching Ollama.
-    </p>
+<!-- Blacklist tab -->
+<div id="tab-blacklist" class="tab-panel" style="display:none;">
+  <p style="color:var(--pico-muted-color); font-size:0.85rem; margin-top:0;">
+    Lines matching ALL terms in an entry are dropped before reaching Ollama.
+  </p>
+  {% if blacklist %}
+  <table>
+    <thead>
+      <tr><th>Terms (all must match)</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for entry in blacklist %}
+      <tr>
+        <td>
+          {% for term in entry.terms.split(',') %}
+          <code style="font-size:0.78rem; margin-right:0.3rem;">{{ term.strip() }}</code>
+          {% endfor %}
+        </td>
+        <td>
+          <form method="post" action="/servers/{{ server.id }}/blacklist/{{ entry.id }}/delete" style="margin:0;"
+                onsubmit="return confirm('Remove this blacklist entry?')">
+            <button type="submit" class="btn-sm secondary outline">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:var(--pico-muted-color); font-size:0.9rem;">No blacklist entries yet.</p>
+  {% endif %}
 
-    {% if blacklist %}
-    <table>
-      <thead>
-        <tr><th>Terms (all must match)</th><th></th></tr>
-      </thead>
-      <tbody>
-        {% for entry in blacklist %}
-        <tr>
-          <td>
-            {% for term in entry.terms.split(',') %}
-            <code style="font-size:0.78rem; margin-right:0.3rem;">{{ term.strip() }}</code>
-            {% endfor %}
-          </td>
-          <td>
-            <form method="post" action="/servers/{{ server.id }}/blacklist/{{ entry.id }}/delete" style="margin:0;"
-                  onsubmit="return confirm('Remove this blacklist entry?')">
-              <button type="submit" class="btn-sm secondary outline">Remove</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p style="color:var(--pico-muted-color); font-size:0.9rem;">No blacklist entries yet.</p>
-    {% endif %}
-
-    <h5 style="margin-top:1.5rem;">Add Entry</h5>
+  <h5 style="margin-top:1.5rem;">Add Entry</h5>
+  <div style="max-width:480px;">
     <form method="post" action="/servers/{{ server.id }}/blacklist">
       <label>
         Terms <small>(comma-separated, ALL must appear in a line to drop it)</small>
-        <input type="text" name="terms" required
-               placeholder="e.g. QPainter, flameshot">
+        <input type="text" name="terms" required placeholder="e.g. QPainter, flameshot">
       </label>
       <button type="submit" class="btn-sm">Add</button>
     </form>
   </div>
-
-  {% endif %}
 </div>
 
-{% if server and alerts %}
-<hr>
-<h4>Recent Alerts</h4>
-<table>
-  <thead>
-    <tr><th>Time</th><th>Source</th><th>Reason</th></tr>
-  </thead>
-  <tbody>
-    {% for a in alerts %}
-    <tr class="alert-row">
-      <td>{{ a.triggered_at }}</td>
-      <td><code>{{ a.log_source }}</code></td>
-      <td>{{ a.reason }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endif %}
+<!-- Notifications tab -->
+<div id="tab-notifications" class="tab-panel" style="display:none;">
+  <div style="max-width:480px;">
+    <form method="post" action="/servers/{{ server.id }}/notifications">
+      <h5>Discord</h5>
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input type="checkbox" name="discord_enabled" value="1" role="switch"
+               {% if server.discord_enabled %}checked{% endif %}
+               style="width:auto; margin:0;">
+        Send alerts to Discord
+      </label>
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; margin-top:0.75rem;">
+        <input type="checkbox" name="show_reasoning" value="1" role="switch"
+               {% if server.show_reasoning %}checked{% endif %}
+               style="width:auto; margin:0;">
+        Include reasoning in Discord alerts
+      </label>
+      <label style="margin-top:1rem;">
+        Webhook URL <small>(optional — overrides the global webhook for this server)</small>
+        <input type="text" name="discord_webhook_url"
+               value="{{ server.discord_webhook_url or '' }}"
+               placeholder="https://discord.com/api/webhooks/… — leave blank to use global">
+      </label>
+      <p style="font-size:0.8rem; color:var(--pico-muted-color); margin-top:0.25rem;">
+        Global webhook is configured in <a href="/settings">Settings</a>.
+      </p>
 
-{% if server %}
-<hr>
-<h4>SSH Host Key</h4>
-{% if fingerprint %}
-<p style="font-size:0.85rem; color:var(--pico-muted-color);">
-  Trusted fingerprint: <code>{{ fingerprint }}</code>
-</p>
-<form method="post" action="/servers/{{ server.id }}/clear-fingerprint"
-      onsubmit="return confirm('Clear the trusted fingerprint? The next connection will re-learn and re-trust the host key.')">
-  <button type="submit" class="btn-sm secondary outline">Clear fingerprint</button>
-</form>
-{% else %}
-<p style="font-size:0.85rem; color:var(--pico-muted-color);">
-  No fingerprint stored yet — the host key will be trusted and saved on first connection.
-</p>
-{% endif %}
+      <button type="submit" style="margin-top:1rem;">Save</button>
+    </form>
+  </div>
+</div>
+
+<!-- History tab -->
+<div id="tab-history" class="tab-panel" style="display:none;">
+  {% if alerts %}
+  <table style="table-layout:fixed; width:100%;">
+    <thead>
+      <tr>
+        <th style="width:11rem;">Time</th>
+        <th style="width:10rem;">Source</th>
+        <th>Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in alerts %}
+      <tr class="alert-row {% if a.log_snippet %}alert-expandable{% endif %}"
+          {% if a.log_snippet %}onclick="toggleSnippet('snippet-{{ loop.index }}')" style="cursor:pointer;"{% endif %}>
+        <td>{{ a.triggered_at }}</td>
+        <td><code>{{ a.log_source }}</code></td>
+        <td>
+          {{ a.reason }}
+          {% if a.log_snippet %}
+          <div class="snippet">{{ a.log_snippet[:120] }}</div>
+          {% endif %}
+        </td>
+      </tr>
+      {% if a.log_snippet %}
+      <tr id="snippet-{{ loop.index }}" style="display:none;">
+        <td colspan="3" style="padding-top:0;">
+          <pre class="snippet-expanded">{{ a.log_snippet }}</pre>
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:var(--pico-muted-color);">No alerts recorded for this server yet.</p>
+  {% endif %}
+  <script>
+    function toggleSnippet(id) {
+      var row = document.getElementById(id);
+      row.style.display = row.style.display === 'none' ? '' : 'none';
+    }
+  </script>
+</div>
+
 {% endif %}
 
 {% if not server %}
 <p><a href="/">&#8592; Back</a></p>
 {% endif %}
+
+<style>
+  .tab-btn.active { color: var(--pico-primary) !important; border-bottom-color: var(--pico-primary) !important; }
+  .tab-btn:hover:not(.active) { color: var(--pico-color) !important; }
+</style>
+<script>
+  function switchTab(name) {
+    document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; });
+    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('tab-' + name).style.display = '';
+    document.getElementById('tab-btn-' + name).classList.add('active');
+    history.replaceState(null, '', '#' + name);
+  }
+  // Restore tab from URL hash on load
+  var hash = window.location.hash.replace('#', '');
+  var valid = ['connection','sources','blacklist','notifications','history'];
+  if (hash && valid.indexOf(hash) !== -1) switchTab(hash);
+</script>
 
 {% endblock %}

@@ -292,16 +292,19 @@ class ServerWorker:
             log_snippet=snippet,
         )
 
-        await discord_client.send_alert(
-            webhook_url=live_settings.get("discord_webhook_url", ""),
-            server_name=self.server["name"],
-            server_host=self.server["host"],
-            log_source=source["source"],
-            source_type=source["type"],
-            reason=reason,
-            snippet=lines,
-            reasoning=reasoning if show_reasoning else "",
-        )
+        if self.server.get("discord_enabled", 0):
+            webhook_url = (self.server.get("discord_webhook_url") or
+                           live_settings.get("discord_webhook_url", ""))
+            await discord_client.send_alert(
+                webhook_url=webhook_url,
+                server_name=self.server["name"],
+                server_host=self.server["host"],
+                log_source=source["source"],
+                source_type=source["type"],
+                reason=reason,
+                snippet=lines,
+                reasoning=reasoning if show_reasoning else "",
+            )
 
     # -----------------------------------------------------------------------
     # Timed fetch
@@ -419,13 +422,16 @@ class ServerWorker:
             log_snippet="\n".join(snippet),
         )
 
-        await discord_client.send_alert(
-            webhook_url=live_settings.get("discord_webhook_url", ""),
-            server_name=self.server["name"],
-            server_host=self.server["host"],
-            log_source=source["source"],
-            source_type=f"{source['type']} (timed {source['fetch_interval_minutes']}m)",
-            reason=f"[{window}] {reason}",
-            snippet=snippet,
-            reasoning="",
-        )
+        if self.server.get("discord_enabled", 0):
+            webhook_url = (self.server.get("discord_webhook_url") or
+                           live_settings.get("discord_webhook_url", ""))
+            await discord_client.send_alert(
+                webhook_url=webhook_url,
+                server_name=self.server["name"],
+                server_host=self.server["host"],
+                log_source=source["source"],
+                source_type=f"{source['type']} (timed {source['fetch_interval_minutes']}m)",
+                reason=f"[{window}] {reason}",
+                snippet=snippet,
+                reasoning="",
+            )
