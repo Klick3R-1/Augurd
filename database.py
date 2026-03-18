@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS log_sources (
     type TEXT NOT NULL CHECK(type IN ('journalctl', 'file')),
     source TEXT NOT NULL,
     enabled INTEGER DEFAULT 1,
+    fetch_interval_minutes INTEGER DEFAULT NULL,
+    last_fetched_at TEXT DEFAULT NULL,
     FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
 );
 
@@ -89,6 +91,8 @@ async def init_db():
             "ALTER TABLE servers ADD COLUMN model_override TEXT",
             "ALTER TABLE servers ADD COLUMN prompt_override TEXT",
             "ALTER TABLE servers ADD COLUMN show_reasoning INTEGER DEFAULT 0",
+            "ALTER TABLE log_sources ADD COLUMN fetch_interval_minutes INTEGER DEFAULT NULL",
+            "ALTER TABLE log_sources ADD COLUMN last_fetched_at TEXT DEFAULT NULL",
         ]:
             try:
                 await db.execute(migration)
@@ -164,14 +168,23 @@ async def get_log_sources(server_id: int):
             return [dict(r) for r in await cur.fetchall()]
 
 
-async def add_log_source(server_id: int, source_type: str, source: str):
+async def add_log_source(server_id: int, source_type: str, source: str, fetch_interval_minutes: int | None = None):
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
-            "INSERT INTO log_sources (server_id, type, source) VALUES (?, ?, ?)",
-            (server_id, source_type, source),
+            "INSERT INTO log_sources (server_id, type, source, fetch_interval_minutes) VALUES (?, ?, ?, ?)",
+            (server_id, source_type, source, fetch_interval_minutes),
         )
         await db.commit()
         return cur.lastrowid
+
+
+async def update_log_source_last_fetched(source_id: int, timestamp: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE log_sources SET last_fetched_at = ? WHERE id = ?",
+            (timestamp, source_id),
+        )
+        await db.commit()
 
 
 async def toggle_log_source(source_id: int, enabled: bool):

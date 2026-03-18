@@ -1,9 +1,10 @@
 import asyncio
 import asyncssh
 import logging
+import re
 import shlex
 import socket
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -169,6 +170,11 @@ class ServerWorker:
                 logger.warning(f"[{self.server['name']}] Auth required — open in browser: {line}")
 
     async def _monitor_source(self, conn: asyncssh.SSHClientConnection, source: dict):
+        if source.get("fetch_interval_minutes"):
+            await self._monitor_source_timed(conn, source)
+            return
+
+
         if source["type"] == "journalctl":
             unit = source["source"].strip()
             if unit and unit != "*":
@@ -272,4 +278,131 @@ class ServerWorker:
             reason=reason,
             snippet=lines,
             reasoning=reasoning if show_reasoning else "",
+        )
+
+    # -----------------------------------------------------------------------
+    # Timed fetch
+    # -----------------------------------------------------------------------
+
+    _TS_RE = re.compile(
+        r"^(?P<mon>[A-Z][a-z]{2})\s+(?P<day>\d{1,2})\s+(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})\s+"
+    )
+    _PID_RE = re.compile(r"\[\d+\]")
+    _HEX_RE = re.compile(r"\b0x[0-9a-fA-F]+\b")
+
+    def _normalize(self, line: str) -> str:
+        line = self._TS_RE.sub(
+            lambda m: f"{m.group('mon')} {m.group('day')} {m.group('hour')}:{m.group('minute')}:00 ",
+            line, count=1,
+        )
+        line = self._PID_RE.sub("[PID]", line)
+        line = self._HEX_RE.sub("0xHEX", line)
+        return line
+
+    def _compress(self, lines: list[str]) -> list[str]:
+        if not lines:
+            return []
+        out = []
+        first, first_norm, count = lines[0], self._normalize(lines[0]), 1
+        m = self._TS_RE.match(lines[0])
+        start = end = f"{m.group('hour')}:{m.group('minute')}" if m else "??:??"
+        for line in lines[1:]:
+            norm = self._normalize(line)
+            if norm == first_norm:
+                count += 1
+                m = self._TS_RE.match(line)
+                end = f"{m.group('hour')}:{m.group('minute')}" if m else end
+            else:
+                out.append(first if count == 1 else f"{first} (x{count} {start}-{end})")
+                first, first_norm, count = line, norm, 1
+                m = self._TS_RE.match(line)
+                start = end = f"{m.group('hour')}:{m.group('minute')}" if m else "??:??"
+        out.append(first if count == 1 else f"{first} (x{count} {start}-{end})")
+        return out
+
+    async def _monitor_source_timed(self, conn: asyncssh.SSHClientConnection, source: dict):
+        interval = source["fetch_interval_minutes"] * 60  # seconds
+
+        while not self._stop_event.is_set():
+            now = datetime.now()
+            last_str = source.get("last_fetched_at")
+
+            if last_str:
+                last_dt = datetime.fromisoformat(last_str)
+                elapsed = (now - last_dt).total_seconds()
+                since = last_dt if elapsed <= 3 * interval else now - timedelta(seconds=interval)
+            else:
+                since = now - timedelta(seconds=interval)
+
+            since_str = since.strftime("%Y-%m-%d %H:%M:%S")
+            unit = source["source"].strip()
+            if unit and unit != "*":
+                cmd = f"journalctl --no-pager -o short-iso --since '{since_str}' -u {unit}"
+            else:
+                cmd = f"journalctl --no-pager -o short-iso --since '{since_str}'"
+
+            logger.info(f"[{self.server['name']}] Timed fetch ({source['source']}) since {since_str}")
+
+            lines = []
+            async with conn.create_process(cmd) as proc:
+                async for raw in proc.stdout:
+                    line = raw.rstrip("\n")
+                    if line and not self._is_blacklisted(line):
+                        lines.append(line)
+
+            await database.update_log_source_last_fetched(source["id"], now.isoformat())
+            source["last_fetched_at"] = now.isoformat()
+
+            logger.info(f"[{self.server['name']}] Timed fetch got {len(lines)} lines ({source['source']})")
+
+            if lines:
+                compressed = self._compress(lines)
+                window = f"{since.strftime('%H:%M')}–{now.strftime('%H:%M')}"
+                await self._flush_timed(compressed, source, window)
+
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=interval)
+                break
+            except asyncio.TimeoutError:
+                pass
+
+    async def _flush_timed(self, lines: list[str], source: dict, window: str):
+        live_settings = await database.get_settings()
+        ollama_url = live_settings.get("ollama_url", "http://localhost:11434")
+        model = self.server.get("model_override") or live_settings.get("ollama_model", "llama3.2")
+        self._blacklist = await database.get_blacklist(self.server["id"])
+
+        is_alert, reason = await ollama_client.map_reduce_analyze(
+            ollama_url=ollama_url,
+            model=model,
+            server_name=self.server["name"],
+            source=source["source"],
+            lines=lines,
+            window=window,
+        )
+
+        if not is_alert:
+            return
+
+        self.alert_count += 1
+        snippet = lines[-10:]
+        logger.warning(f"[{self.server['name']}] TIMED ALERT ({source['source']}): {reason}")
+
+        await database.save_alert(
+            server_id=self.server["id"],
+            server_name=self.server["name"],
+            log_source=source["source"],
+            reason=f"[{window}] {reason}",
+            log_snippet="\n".join(snippet),
+        )
+
+        await discord_client.send_alert(
+            webhook_url=live_settings.get("discord_webhook_url", ""),
+            server_name=self.server["name"],
+            server_host=self.server["host"],
+            log_source=source["source"],
+            source_type=f"{source['type']} (timed {source['fetch_interval_minutes']}m)",
+            reason=f"[{window}] {reason}",
+            snippet=snippet,
+            reasoning="",
         )

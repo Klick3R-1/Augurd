@@ -188,11 +188,15 @@ async def log_source_add(
     server_id: int,
     source_type: str = Form(...),
     source: str = Form(...),
+    fetch_mode: str = Form("stream"),
+    fetch_interval_minutes: str = Form(""),
 ):
+    interval = int(fetch_interval_minutes) if fetch_mode == "timed" and fetch_interval_minutes else None
     await database.add_log_source(
         server_id=server_id,
         source_type=source_type,
         source=source.strip(),
+        fetch_interval_minutes=interval,
     )
     # Restart worker to pick up new source
     if worker_manager.get_status(server_id)["status"] == "running":

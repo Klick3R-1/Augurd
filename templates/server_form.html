@@ -114,13 +114,14 @@
     {% if log_sources %}
     <table>
       <thead>
-        <tr><th>Type</th><th>Source</th><th></th></tr>
+        <tr><th>Type</th><th>Source</th><th>Mode</th><th></th></tr>
       </thead>
       <tbody>
         {% for src in log_sources %}
         <tr>
           <td><small>{{ src.type }}</small></td>
           <td><code style="font-size:0.8rem;">{{ src.source }}</code></td>
+          <td><small>{% if src.fetch_interval_minutes %}every {{ src.fetch_interval_minutes }}m{% else %}stream{% endif %}</small></td>
           <td>
             <form method="post" action="/servers/{{ server.id }}/log-sources/{{ src.id }}/delete" style="margin:0;"
                   onsubmit="return confirm('Remove {{ src.source }}?')">
@@ -137,20 +138,56 @@
 
     <h5 style="margin-top:1.5rem;">Add Source</h5>
     <form method="post" action="/servers/{{ server.id }}/log-sources">
-      <label>
-        Type
-        <select name="source_type">
-          <option value="journalctl">journalctl unit</option>
-          <option value="file">log file</option>
-        </select>
-      </label>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+        <label>
+          Type
+          <select name="source_type" id="source_type_select" onchange="updateFetchMode()">
+            <option value="journalctl">journalctl unit</option>
+            <option value="file">log file</option>
+          </select>
+        </label>
+        <label id="fetch_mode_wrap">
+          Fetch mode
+          <select name="fetch_mode" id="fetch_mode_select" onchange="updateInterval()">
+            <option value="stream">Streaming (live tail)</option>
+            <option value="timed">Timed fetch</option>
+          </select>
+        </label>
+      </div>
       <label>
         Source
         <input type="text" name="source" required
                placeholder="e.g. sshd.service — or * for all logs (journalctl only)">
       </label>
+      <div id="interval_wrap" style="display:none;">
+        <label>
+          Fetch interval
+          <select name="fetch_interval_minutes">
+            <option value="15">Every 15 minutes</option>
+            <option value="30">Every 30 minutes</option>
+            <option value="60">Every hour</option>
+            <option value="120">Every 2 hours</option>
+            <option value="240">Every 4 hours</option>
+            <option value="360" selected>Every 6 hours</option>
+          </select>
+        </label>
+      </div>
       <button type="submit" class="btn-sm">Add</button>
     </form>
+    <script>
+      function updateFetchMode() {
+        var t = document.getElementById('source_type_select').value;
+        document.getElementById('fetch_mode_wrap').style.display = t === 'file' ? 'none' : '';
+        if (t === 'file') {
+          document.getElementById('fetch_mode_select').value = 'stream';
+          document.getElementById('interval_wrap').style.display = 'none';
+        }
+      }
+      function updateInterval() {
+        var m = document.getElementById('fetch_mode_select').value;
+        document.getElementById('interval_wrap').style.display = m === 'timed' ? '' : 'none';
+      }
+    </script>
 
     <hr>
     <h4>Blacklist</h4>
