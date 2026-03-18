@@ -57,7 +57,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 Open `http://localhost:8000` and:
 
-1. **Settings** — set your Ollama URL, pick a model, paste your Discord webhook URL
+1. **Settings** — set your Ollama URL and pick a model. Optionally paste a Discord webhook URL if you want alerts sent to Discord
 2. **Add Server** — fill in SSH connection details, use "Test Connection" to verify before saving
 3. **Add log sources** — `journalctl` unit name (e.g. `sshd.service`), `*` for all system logs, or a file path
 4. **Start Worker** — augurd SSHes in and begins monitoring; it will auto-restart on app restart
@@ -143,6 +143,11 @@ DHCP lease renewals, and NetworkManager connectivity checks.
 
 This is an early project and several security concerns are known. They will be addressed in upcoming work. Here is the current state:
 
+### Implemented
+
+**SSH host key verification (TOFU)**
+Host key fingerprints are stored on first connection and verified on every subsequent one. If the fingerprint changes, the worker stops after 3 attempts and surfaces the error in the UI. You can clear a stored fingerprint from the server settings page when a key legitimately changes.
+
 ### Known issues being worked on
 
 **Secrets stored plaintext in SQLite**
@@ -155,9 +160,6 @@ The UI has no login. Anyone who can reach the port can view all server configs, 
 State-changing form actions have no CSRF tokens. A malicious page could trigger actions if you are logged in. Middleware is planned.
 
 ### Other risks to be aware of
-
-**SSH host key checking**
-SSH host key fingerprints are stored on first connection (TOFU) and verified on every subsequent connection. If the fingerprint changes, the worker stops after 3 failed attempts and surfaces the error in the UI. You can clear a stored fingerprint from the server settings page when a key legitimately changes.
 
 **SSRF via Ollama URL**
 The Ollama URL field in settings can be pointed at any address on your network. On an exposed UI this could be used to probe internal services. Restrict UI access.
