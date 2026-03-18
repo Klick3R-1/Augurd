@@ -254,8 +254,18 @@ async def server_update(
     # If the host changed, the stored fingerprint is no longer valid
     if existing and existing["host"] != host:
         await database.delete_server_fingerprint(server_id)
-    # Restart worker if running so it picks up new connection details
-    if worker_manager.get_status(server_id)["status"] == "running":
+    # Only restart the worker if connection-relevant fields changed
+    connection_changed = existing and any([
+        existing["host"] != host,
+        existing["port"] != int(port),
+        existing["username"] != username,
+        existing["ssh_key_path"] != (ssh_key_path.strip() or None),
+        existing["ssh_key_content"] != (ssh_key_content.strip() or None),
+        existing["proxy_command"] != (proxy_command.strip() or None),
+        existing["force_password_auth"] != int(bool(force_password_auth)),
+        ssh_password.strip(),  # new password provided
+    ])
+    if connection_changed and worker_manager.get_status(server_id)["status"] == "running":
         await worker_manager.stop_worker(server_id)
         await worker_manager.start_worker(server_id)
     return redirect(f"/servers/{server_id}")
@@ -313,7 +323,7 @@ async def log_source_add(
     if worker_manager.get_status(server_id)["status"] == "running":
         await worker_manager.stop_worker(server_id)
         await worker_manager.start_worker(server_id)
-    return redirect(f"/servers/{server_id}")
+    return redirect(f"/servers/{server_id}#sources")
 
 
 @app.post("/servers/{server_id}/log-sources/{source_id}/delete")
@@ -322,7 +332,7 @@ async def log_source_delete(server_id: int, source_id: int):
     if worker_manager.get_status(server_id)["status"] == "running":
         await worker_manager.stop_worker(server_id)
         await worker_manager.start_worker(server_id)
-    return redirect(f"/servers/{server_id}")
+    return redirect(f"/servers/{server_id}#sources")
 
 
 # ---------------------------------------------------------------------------
@@ -332,13 +342,13 @@ async def log_source_delete(server_id: int, source_id: int):
 @app.post("/servers/{server_id}/blacklist")
 async def blacklist_add(server_id: int, terms: str = Form(...)):
     await database.add_blacklist_entry(server_id=server_id, terms=terms)
-    return redirect(f"/servers/{server_id}")
+    return redirect(f"/servers/{server_id}#blacklist")
 
 
 @app.post("/servers/{server_id}/blacklist/{entry_id}/delete")
 async def blacklist_delete(server_id: int, entry_id: int):
     await database.delete_blacklist_entry(entry_id)
-    return redirect(f"/servers/{server_id}")
+    return redirect(f"/servers/{server_id}#blacklist")
 
 
 # ---------------------------------------------------------------------------

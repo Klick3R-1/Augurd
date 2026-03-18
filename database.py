@@ -172,13 +172,23 @@ async def update_server(server_id, name, host, port, username, ssh_key_path=None
                         model_override=None, prompt_override=None, show_reasoning=False,
                         discord_enabled=True):
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE servers SET name=?, host=?, port=?, username=?, ssh_key_path=?, ssh_key_content=?, ssh_password=?, force_password_auth=?, proxy_command=?, model_override=?, prompt_override=?, show_reasoning=?, discord_enabled=? WHERE id=?",
-            (name, host, int(port), username, ssh_key_path or None, ssh_key_content or None,
-             ssh_password or None, 1 if force_password_auth else 0, proxy_command or None,
-             model_override or None, prompt_override or None, 1 if show_reasoning else 0,
-             1 if discord_enabled else 0, server_id),
-        )
+        # Only update ssh_password if a new value was provided — blank means keep existing
+        if ssh_password:
+            await db.execute(
+                "UPDATE servers SET name=?, host=?, port=?, username=?, ssh_key_path=?, ssh_key_content=?, ssh_password=?, force_password_auth=?, proxy_command=?, model_override=?, prompt_override=?, show_reasoning=?, discord_enabled=? WHERE id=?",
+                (name, host, int(port), username, ssh_key_path or None, ssh_key_content or None,
+                 ssh_password, 1 if force_password_auth else 0, proxy_command or None,
+                 model_override or None, prompt_override or None, 1 if show_reasoning else 0,
+                 1 if discord_enabled else 0, server_id),
+            )
+        else:
+            await db.execute(
+                "UPDATE servers SET name=?, host=?, port=?, username=?, ssh_key_path=?, ssh_key_content=?, force_password_auth=?, proxy_command=?, model_override=?, prompt_override=?, show_reasoning=?, discord_enabled=? WHERE id=?",
+                (name, host, int(port), username, ssh_key_path or None, ssh_key_content or None,
+                 1 if force_password_auth else 0, proxy_command or None,
+                 model_override or None, prompt_override or None, 1 if show_reasoning else 0,
+                 1 if discord_enabled else 0, server_id),
+            )
         await db.commit()
 
 
