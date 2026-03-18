@@ -44,6 +44,16 @@ table { font-size: 0.82rem; }
   font-family: monospace;
   max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.snippet-expanded {
+  font-size: 0.72rem; color: var(--aug-muted);
+  font-family: monospace;
+  white-space: pre-wrap; word-break: break-all;
+  margin: 0.5rem 0 0; padding: 0.5rem;
+  background: var(--pico-card-background-color);
+  border-radius: 4px;
+  max-height: 300px; overflow-y: auto;
+}
+tr.alert-expandable:hover td { background: var(--pico-card-background-color); }
 
 /* ── buttons ──────────────────────────────────────────────────── */
 .btn-sm {

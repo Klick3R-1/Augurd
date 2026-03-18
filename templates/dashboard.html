@@ -61,32 +61,47 @@
 
 <h3>Recent Alerts</h3>
 {% if alerts %}
-<table>
+<table style="table-layout:fixed; width:100%;">
   <thead>
     <tr>
-      <th>Time</th>
-      <th>Server</th>
-      <th>Source</th>
+      <th style="width:11rem;">Time</th>
+      <th style="width:10rem;">Server</th>
+      <th style="width:5rem;">Source</th>
       <th>Reason</th>
     </tr>
   </thead>
   <tbody>
     {% for a in alerts %}
-    <tr class="alert-row">
+    <tr class="alert-row {% if a.log_snippet %}alert-expandable{% endif %}"
+        {% if a.log_snippet %}onclick="toggleSnippet('snippet-{{ loop.index }}')" style="cursor:pointer;"{% endif %}>
       <td>{{ a.triggered_at }}</td>
       <td>{{ a.server_name }}</td>
       <td><code>{{ a.log_source }}</code></td>
       <td>
         {{ a.reason }}
         {% if a.log_snippet %}
-        <div class="snippet">{{ a.log_snippet[:200] }}</div>
+        <div class="snippet">{{ a.log_snippet[:120] }}</div>
         {% endif %}
       </td>
     </tr>
+    {% if a.log_snippet %}
+    <tr id="snippet-{{ loop.index }}" style="display:none;">
+      <td colspan="4" style="padding-top:0;">
+        <pre class="snippet-expanded">{{ a.log_snippet }}</pre>
+      </td>
+    </tr>
+    {% endif %}
     {% endfor %}
   </tbody>
 </table>
 {% else %}
 <p style="color: var(--pico-muted-color);">No alerts yet.</p>
 {% endif %}
+
+<script>
+function toggleSnippet(id) {
+  var row = document.getElementById(id);
+  row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+</script>
 {% endblock %}
