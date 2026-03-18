@@ -2,7 +2,7 @@
 
 ## Security (priority)
 
-- [ ] SSH host key trust-on-first-use (TOFU) — store fingerprint on first connect, reject if it changes; critical for internet-facing servers (Hetzner etc.)
+- [x] SSH host key trust-on-first-use (TOFU) — store fingerprint on first connect, reject if it changes; critical for internet-facing servers (Hetzner etc.)
 - [ ] Encrypt secrets at rest in SQLite (SSH keys, passwords, Discord webhook URL)
 - [ ] Built-in web UI authentication (before relying solely on reverse proxy)
 - [ ] CSRF protection on all state-changing form actions
@@ -46,5 +46,6 @@
 - [x] ProxyCommand support via socketpair (cloudflared tunnels working)
 - [x] Cloudflare auth URL surfaced as clickable link in UI
 - [x] SSH key paste field (stored in DB, loaded via asyncssh directly)
+- [x] SSH host key TOFU — fingerprint stored on first connect, mismatch stops worker after 3 retries
 - [x] Password auth mode (disables SSH agent)
 - [x] Ollama model dropdown populated from installed models
