@@ -55,6 +55,13 @@ CREATE TABLE IF NOT EXISTS alerts (
     triggered_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS ssh_known_hosts (
+    server_id INTEGER PRIMARY KEY,
+    fingerprint TEXT NOT NULL,
+    added_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+);
 """
 
 DEFAULT_ANALYSIS_PROMPT = """\
@@ -154,6 +161,32 @@ async def update_server(server_id, name, host, port, username, ssh_key_path=None
 async def delete_server(server_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM servers WHERE id = ?", (server_id,))
+        await db.commit()
+
+
+# --- SSH known hosts (TOFU) ---
+
+async def get_server_fingerprint(server_id: int) -> str | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT fingerprint FROM ssh_known_hosts WHERE server_id = ?", (server_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
+async def set_server_fingerprint(server_id: int, fingerprint: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO ssh_known_hosts (server_id, fingerprint, added_at) VALUES (?, ?, datetime('now'))",
+            (server_id, fingerprint),
+        )
+        await db.commit()
+
+
+async def delete_server_fingerprint(server_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM ssh_known_hosts WHERE server_id = ?", (server_id,))
         await db.commit()
 
 

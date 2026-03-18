@@ -255,6 +255,24 @@
 </table>
 {% endif %}
 
+{% if server %}
+<hr>
+<h4>SSH Host Key</h4>
+{% if fingerprint %}
+<p style="font-size:0.85rem; color:var(--pico-muted-color);">
+  Trusted fingerprint: <code>{{ fingerprint }}</code>
+</p>
+<form method="post" action="/servers/{{ server.id }}/clear-fingerprint"
+      onsubmit="return confirm('Clear the trusted fingerprint? The next connection will re-learn and re-trust the host key.')">
+  <button type="submit" class="btn-sm secondary outline">Clear fingerprint</button>
+</form>
+{% else %}
+<p style="font-size:0.85rem; color:var(--pico-muted-color);">
+  No fingerprint stored yet — the host key will be trusted and saved on first connection.
+</p>
+{% endif %}
+{% endif %}
+
 {% if not server %}
 <p><a href="/">&#8592; Back</a></p>
 {% endif %}

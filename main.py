@@ -119,6 +119,7 @@ async def server_detail(request: Request, server_id: int):
     status = worker_manager.get_status(server_id)
     settings = await database.get_settings()
     models = await ollama_client.get_models(settings.get("ollama_url", "http://localhost:11434"))
+    fingerprint = await database.get_server_fingerprint(server_id)
     return templates.TemplateResponse(
         "server_form.html",
         {
@@ -129,6 +130,7 @@ async def server_detail(request: Request, server_id: int):
             "alerts": alerts,
             "worker": status,
             "models": models,
+            "fingerprint": fingerprint,
             "errors": [],
         },
     )
@@ -150,6 +152,7 @@ async def server_update(
     model_override: str = Form(""),
     prompt_override: str = Form(""),
 ):
+    existing = await database.get_server(server_id)
     await database.update_server(
         server_id=server_id,
         name=name,
@@ -165,10 +168,19 @@ async def server_update(
         model_override=model_override.strip() or None,
         prompt_override=prompt_override.strip() or None,
     )
+    # If the host changed, the stored fingerprint is no longer valid
+    if existing and existing["host"] != host:
+        await database.delete_server_fingerprint(server_id)
     # Restart worker if running so it picks up new connection details
     if worker_manager.get_status(server_id)["status"] == "running":
         await worker_manager.stop_worker(server_id)
         await worker_manager.start_worker(server_id)
+    return redirect(f"/servers/{server_id}")
+
+
+@app.post("/servers/{server_id}/clear-fingerprint")
+async def server_clear_fingerprint(server_id: int):
+    await database.delete_server_fingerprint(server_id)
     return redirect(f"/servers/{server_id}")
 
 

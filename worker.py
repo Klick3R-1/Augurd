@@ -55,15 +55,24 @@ class ServerWorker:
 
     async def _run_loop(self):
         """Outer reconnect loop — keeps trying until stop() is called."""
+        consecutive_mismatch = 0
         while not self._stop_event.is_set():
             try:
                 await self._connect_and_monitor()
+                consecutive_mismatch = 0
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 self.status = "error"
                 self.error = str(e)
                 logger.error(f"[{self.server['name']}] Worker error: {e}")
+                if "Host key mismatch" in str(e):
+                    consecutive_mismatch += 1
+                    if consecutive_mismatch >= 3:
+                        logger.error(f"[{self.server['name']}] Host key mismatch persists after 3 attempts — stopping worker.")
+                        break
+                else:
+                    consecutive_mismatch = 0
 
             if self._stop_event.is_set():
                 break
@@ -142,6 +151,20 @@ class ServerWorker:
 
         try:
             async with asyncssh.connect(**connect_kwargs) as conn:
+                # TOFU host key verification
+                host_key = conn.get_server_host_key()
+                fingerprint = host_key.get_fingerprint() if host_key else None
+                if fingerprint:
+                    stored = await database.get_server_fingerprint(self.server["id"])
+                    if stored is None:
+                        await database.set_server_fingerprint(self.server["id"], fingerprint)
+                        logger.info(f"[{self.server['name']}] TOFU: stored new host fingerprint {fingerprint}")
+                    elif stored != fingerprint:
+                        raise Exception(
+                            f"Host key mismatch! Stored: {stored} — Got: {fingerprint}. "
+                            "If the server's host key legitimately changed, clear it from the server settings."
+                        )
+
                 self.auth_url = None  # Authenticated — clear the URL
                 self.status = "running"
                 self.error = None
