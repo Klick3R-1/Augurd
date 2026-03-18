@@ -2,7 +2,21 @@
 
 A self-hosted log monitoring tool that tails logs from remote servers via SSH, analyses them with a local [Ollama](https://ollama.com) instance, and sends alerts to Discord via webhook.
 
-> **This is a very early-stage project.** It works, but rough edges exist and several security concerns are known and being actively worked on. See the security section before deploying.
+> **This is an early-stage project.** It works, but rough edges exist and several security concerns are known and being actively worked on. See the security section before deploying.
+
+## Why this exists
+
+There are plenty of log monitoring solutions out there, but I wanted something tailored to my own servers and the servers I manage — this is the result of that work.
+
+A few things to keep in mind:
+
+**The dashboard should never be exposed to the clearnet.** Keep it on your local network. It can be exposed through a Cloudflare Tunnel, but only with authentication-gated access in front of it — Cloudflare Access enforces that at the edge before traffic ever reaches your machine, and since the tunnel is outbound-only, no ports need to be open on your server. This makes it a stronger option than plain SSH over the internet for exposing the UI.
+
+**On SSH access for log fetching:** I use Cloudflare Tunnels for SSH, which is why `cloudflared` is a first-class option. Cloudflare Tunnel is the recommended approach for internet-facing servers — access is gated by Cloudflare Access before the SSH session starts, and no inbound port is exposed. Plain SSH over the internet is also supported, but if you go that route, use key auth only — password auth is vulnerable to brute force and should not be used on internet-facing servers.
+
+**On TOFU and MITM protection:** The TOFU implementation stores the server's host key fingerprint on first connection and rejects any subsequent connection where the fingerprint has changed. This protects against man-in-the-middle attacks on all connections after the first. The caveat is the very first connection — if you're on an untrusted network when you first add a server, you could inadvertently trust a bad key. If that's a concern, verify the fingerprint shown in the UI matches what the server actually has (`ssh-keyscan <host>` or checking `/etc/ssh/ssh_host_*.pub` directly on the server).
+
+**On cloud LLM providers:** augurd is intentionally built around local Ollama. Your logs contain hostnames, IPs, usernames, service names, and potentially sensitive output — with a local model none of that leaves the machine running augurd. With an external API provider it would, which is a meaningful privacy concern for most self-hosted setups. Support for external providers may be added at some point, but privacy-first local inference is the intended model. If token cost is also a concern: continuous streaming generates a high volume of calls that would make external APIs impractical regardless — the timed fetch mode reduces this somewhat, but local inference remains the right default.
 
 ---
 
@@ -10,11 +24,16 @@ A self-hosted log monitoring tool that tails logs from remote servers via SSH, a
 
 - Web UI to configure servers, SSH connections, and log sources
 - Streams logs over SSH — supports `journalctl` units, full journal, or any log file via `tail -F`
+- Timed fetch mode for journalctl — polls on an interval instead of streaming, with deduplication
 - Buffers log lines and sends them to a local Ollama model for analysis
 - Fires a Discord embed alert when the model flags something worth attention
 - Per-server model and prompt overrides so you can tune sensitivity per machine
 - ProxyCommand support (e.g. Cloudflare Tunnels via `cloudflared`)
 - Cloudflare auth URL surfaced in the UI when browser authentication is required
+- SSH host key TOFU — fingerprint stored on first connect, mismatch stops the worker
+- Test Connection button — verify SSH credentials before saving
+- Workers auto-restart on app restart — running state is persisted
+- Blacklist rules — drop noisy log lines before they reach Ollama
 
 ## Stack
 
@@ -39,9 +58,9 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 Open `http://localhost:8000` and:
 
 1. **Settings** — set your Ollama URL, pick a model, paste your Discord webhook URL
-2. **Add Server** — fill in SSH connection details
+2. **Add Server** — fill in SSH connection details, use "Test Connection" to verify before saving
 3. **Add log sources** — `journalctl` unit name (e.g. `sshd.service`), `*` for all system logs, or a file path
-4. **Start Worker** — augurd SSHes in and begins monitoring
+4. **Start Worker** — augurd SSHes in and begins monitoring; it will auto-restart on app restart
 
 ### Ollama
 
@@ -92,6 +111,10 @@ cloudflared access ssh --hostname %h
 
 When the proxy command outputs a browser authentication URL, augurd surfaces it as a clickable link in the UI.
 
+### Blacklist
+
+Per-server blacklist rules drop log lines before they reach Ollama. Each rule specifies one or more comma-separated terms — a line is dropped only if **all** terms appear in it. Useful for silencing known-noisy sources like mDNS, DHCP, or health check traffic.
+
 ---
 
 ## Analysis prompt
@@ -131,10 +154,10 @@ The UI has no login. Anyone who can reach the port can view all server configs, 
 **No CSRF protection**
 State-changing form actions have no CSRF tokens. A malicious page could trigger actions if you are logged in. Middleware is planned.
 
-**SSH host key checking disabled**
-All SSH connections use `known_hosts=None`, meaning man-in-the-middle attacks on SSH connections would go undetected. Per-server known hosts verification is planned.
-
 ### Other risks to be aware of
+
+**SSH host key checking**
+SSH host key fingerprints are stored on first connection (TOFU) and verified on every subsequent connection. If the fingerprint changes, the worker stops after 3 failed attempts and surfaces the error in the UI. You can clear a stored fingerprint from the server settings page when a key legitimately changes.
 
 **SSRF via Ollama URL**
 The Ollama URL field in settings can be pointed at any address on your network. On an exposed UI this could be used to probe internal services. Restrict UI access.
