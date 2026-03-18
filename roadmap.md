@@ -12,7 +12,7 @@
 
 - [ ] Prompt injection hardening — public-facing servers can write crafted log lines to manipulate LLM analysis
 - [ ] Per-source alert cooldown — currently cooldown is per-server, not per log source
-- [ ] Worker auto-start on app restart (persist desired running state in DB)
+- [x] Worker auto-start on app restart (persist desired running state in DB)
 - [ ] Handle Ollama prompt injection via log lines more robustly
 
 ## Hardening / correctness (continued)
@@ -21,7 +21,7 @@
 
 ## Features
 
-- [ ] Test connection button on server form (verify SSH before saving)
+- [x] Test connection button on server form (verify SSH before saving)
 - [ ] Alert history page with filtering (by server, date range, keyword)
 - [ ] `.env` / config file for Ollama URL so it doesn't need UI setup on first run
 - [ ] Log source enable/disable toggle without removing it

@@ -1,6 +1,10 @@
 import logging
+import shlex
+import socket
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+import asyncssh
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,6 +29,9 @@ logging.getLogger("uvicorn.access").addFilter(_SuppressStatusPolling())
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await database.init_db()
+    for server_id in await database.get_autostart_servers():
+        await worker_manager.start_worker(server_id)
+        logger.info(f"Auto-started worker for server {server_id}")
     yield
     await worker_manager.stop_all()
 
@@ -74,6 +81,78 @@ async def server_new(request: Request):
         "server_form.html",
         {"request": request, "server": None, "log_sources": [], "blacklist": [], "models": models, "errors": []},
     )
+
+
+@app.post("/servers/test-connection", response_class=HTMLResponse)
+async def test_connection(
+    host: str = Form(...),
+    port: int = Form(22),
+    username: str = Form(...),
+    ssh_key_path: str = Form(""),
+    ssh_key_content: str = Form(""),
+    ssh_password: str = Form(""),
+    force_password_auth: str = Form(""),
+    proxy_command: str = Form(""),
+):
+    import asyncio
+    connect_kwargs: dict = {
+        "host": host,
+        "port": port,
+        "username": username,
+        "known_hosts": None,
+    }
+
+    if force_password_auth:
+        connect_kwargs["agent_path"] = None
+        connect_kwargs["client_keys"] = []
+        connect_kwargs["preferred_auth"] = "password"
+        if ssh_password.strip():
+            connect_kwargs["password"] = ssh_password.strip()
+    else:
+        key_content = ssh_key_content.strip()
+        key_path = ssh_key_path.strip()
+        if key_content:
+            connect_kwargs["client_keys"] = [asyncssh.import_private_key(key_content)]
+            connect_kwargs["agent_path"] = None
+        elif key_path:
+            connect_kwargs["client_keys"] = [str(Path(key_path).expanduser())]
+            connect_kwargs["agent_path"] = None
+        if ssh_password.strip():
+            connect_kwargs["password"] = ssh_password.strip()
+
+    proxy_proc = None
+    proxy_sock = None
+    try:
+        if proxy_command.strip():
+            cmd = proxy_command.strip().replace("%h", host).replace("%p", str(port))
+            proxy_sock, child_sock = socket.socketpair()
+            proxy_sock.setblocking(False)
+            proxy_proc = await asyncio.create_subprocess_exec(
+                *shlex.split(cmd),
+                stdin=child_sock.fileno(),
+                stdout=child_sock.fileno(),
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            child_sock.close()
+            connect_kwargs["sock"] = proxy_sock
+            connect_kwargs.pop("port", None)
+
+        async with asyncssh.connect(**connect_kwargs) as conn:
+            result = await conn.run("echo ok", check=True)
+            output = result.stdout.strip()
+        ok = output == "ok"
+        msg = f"Connected successfully to {username}@{host}" if ok else f"Connected but unexpected output: {output!r}"
+        style = "color:var(--pico-ins-color);"
+    except Exception as e:
+        msg = f"Connection failed: {e}"
+        style = "color:var(--pico-del-color);"
+    finally:
+        if proxy_proc:
+            proxy_proc.terminate()
+        if proxy_sock:
+            proxy_sock.close()
+
+    return f'<span style="{style} font-size:0.85rem;">{msg}</span>'
 
 
 @app.post("/servers")
@@ -248,12 +327,14 @@ async def blacklist_delete(server_id: int, entry_id: int):
 
 @app.post("/workers/{server_id}/start")
 async def worker_start(server_id: int):
+    await database.set_worker_autostart(server_id, True)
     await worker_manager.start_worker(server_id)
     return redirect(f"/servers/{server_id}")
 
 
 @app.post("/workers/{server_id}/stop")
 async def worker_stop(server_id: int):
+    await database.set_worker_autostart(server_id, False)
     await worker_manager.stop_worker(server_id)
     return redirect(f"/servers/{server_id}")
 

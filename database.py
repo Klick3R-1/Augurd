@@ -98,6 +98,7 @@ async def init_db():
             "ALTER TABLE servers ADD COLUMN model_override TEXT",
             "ALTER TABLE servers ADD COLUMN prompt_override TEXT",
             "ALTER TABLE servers ADD COLUMN show_reasoning INTEGER DEFAULT 0",
+            "ALTER TABLE servers ADD COLUMN worker_autostart INTEGER DEFAULT 0",
             "ALTER TABLE log_sources ADD COLUMN fetch_interval_minutes INTEGER DEFAULT NULL",
             "ALTER TABLE log_sources ADD COLUMN last_fetched_at TEXT DEFAULT NULL",
         ]:
@@ -121,6 +122,23 @@ async def get_all_servers():
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM servers ORDER BY name") as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def set_worker_autostart(server_id: int, enabled: bool):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE servers SET worker_autostart = ? WHERE id = ?",
+            (1 if enabled else 0, server_id),
+        )
+        await db.commit()
+
+
+async def get_autostart_servers() -> list[int]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT id FROM servers WHERE worker_autostart = 1"
+        ) as cur:
+            return [row[0] for row in await cur.fetchall()]
 
 
 async def get_server(server_id: int):

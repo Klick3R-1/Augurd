@@ -102,7 +102,19 @@
                   placeholder="Leave blank to use the global prompt. Required placeholders: {server_name} {source} {log_text}">{{ server.prompt_override if server and server.prompt_override else '' }}</textarea>
       </label>
 
-      <button type="submit">{% if server %}Save Changes{% else %}Create Server{% endif %}</button>
+      <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+        <button type="submit">{% if server %}Save Changes{% else %}Create Server{% endif %}</button>
+        <button type="button" class="btn-sm secondary outline"
+                hx-post="/servers/test-connection"
+                hx-include="closest form"
+                hx-target="#test-conn-result"
+                hx-swap="innerHTML"
+                hx-indicator="#test-conn-spinner">
+          Test Connection
+        </button>
+        <span id="test-conn-spinner" class="htmx-indicator" style="font-size:0.8rem; color:var(--pico-muted-color);">Testing…</span>
+      </div>
+      <div id="test-conn-result" style="margin-top:0.5rem; min-height:1.2rem;"></div>
     </form>
   </div>
 
