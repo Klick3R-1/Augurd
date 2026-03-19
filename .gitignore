@@ -6,3 +6,4 @@ __pycache__/
 *.db-wal
 .env
 *.txt
+test_*.py
