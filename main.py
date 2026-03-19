@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import shlex
 import socket
@@ -12,7 +13,9 @@ from fastapi.templating import Jinja2Templates
 
 import database
 import ollama_client
+import update_checker
 import worker_manager
+from version import __version__
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -32,6 +35,8 @@ async def lifespan(app: FastAPI):
     for server_id in await database.get_autostart_servers():
         await worker_manager.start_worker(server_id)
         logger.info(f"Auto-started worker for server {server_id}")
+    asyncio.create_task(update_checker.check_if_due())
+    asyncio.create_task(update_checker.daily_loop())
     yield
     await worker_manager.stop_all()
 
@@ -39,6 +44,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="augurd", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["app_version"] = __version__
+templates.env.globals["update_available"] = update_checker.update_available
 
 
 def redirect(path: str):

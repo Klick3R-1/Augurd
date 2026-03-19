@@ -14,6 +14,16 @@
       <div style="display:flex; align-items:center; gap:0.75rem;">
         <a class="brand" href="/">&#9656; augurd</a>
         <span class="brand-sub">AI-powered log monitor</span>
+        {% set new_ver, new_url = update_available() %}
+        {% if new_ver %}
+        <a href="{{ new_url }}" target="_blank" rel="noopener"
+           style="font-size:0.72rem; padding:0.15rem 0.5rem; border-radius:4px;
+                  background:var(--pico-ins-color); color:#000; text-decoration:none; font-weight:600;">
+          v{{ new_ver }} available ↗
+        </a>
+        {% else %}
+        <span style="font-size:0.72rem; color:var(--aug-muted);">v{{ app_version }}</span>
+        {% endif %}
       </div>
       <div class="nav-links">
         <a href="/">Dashboard</a>

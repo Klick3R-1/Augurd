@@ -108,7 +108,7 @@ SSH over Cloudflare Tunnel, mixed log sources, imperfect configs. augurd is desi
 ## Setup
 
 ```bash
-git clone https://github.com/yourname/augurd
+git clone https://github.com/Klick3R-1/Augurd
 cd augurd
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
