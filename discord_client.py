@@ -43,7 +43,7 @@ async def send_alert(
             },
         ],
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "footer": {"text": "augurd"},
+        "footer": {"text": "Augurd"},
     }
 
     try:

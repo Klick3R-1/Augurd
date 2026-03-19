@@ -1,4 +1,4 @@
-# augurd roadmap
+# Augurd roadmap
 
 ## Security (priority)
 

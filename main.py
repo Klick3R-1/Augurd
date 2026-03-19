@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     await worker_manager.stop_all()
 
 
-app = FastAPI(title="augurd", lifespan=lifespan)
+app = FastAPI(title="Augurd", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["app_version"] = __version__

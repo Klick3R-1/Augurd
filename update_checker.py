@@ -69,7 +69,7 @@ async def _do_check():
             if tag and tag != __version__:
                 logger.info(f"Update available: v{tag} (running v{__version__})")
             else:
-                logger.info(f"augurd is up to date (v{__version__})")
+                logger.info(f"Augurd is up to date (v{__version__})")
 
     except Exception as e:
         logger.warning(f"Update check failed: {e}")

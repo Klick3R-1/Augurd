@@ -1,4 +1,4 @@
-/* ── augurd design tokens ─────────────────────────────────────── */
+/* ── Augurd design tokens ─────────────────────────────────────── */
 :root {
   --font-size: 13px;
   --aug-muted:     var(--pico-muted-color);

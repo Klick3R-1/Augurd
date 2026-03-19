@@ -1,6 +1,6 @@
-# augurd
+# Augurd
 
-**augurd** is a self-hosted log monitoring tool focused on **actionable signal, not dashboards**.
+**Augurd** is a self-hosted log monitoring tool focused on **actionable signal, not dashboards**.
 
 It connects to your servers over SSH, ingests logs in real time or via timed polling, and uses a local Ollama model to decide one thing:
 
@@ -16,21 +16,21 @@ If not → it stays noise
 
 ---
 
-## What augurd is (and is not)
+## What Augurd is (and is not)
 
-### ✔ augurd is
+### ✔ Augurd is
 - A **log signal filter** for self-hosted environments
 - Built for **operators who already understand their systems**
 - Focused on **low-friction deployment and real-world setups**
 - Designed around **local-first analysis (Ollama)** for privacy and cost control
 
-### ✖ augurd is not
+### ✖ Augurd is not
 - A full SIEM
 - A metrics/observability platform
 - A multi-tenant SaaS
 - A "set and forget" enterprise tool
 
-augurd assumes you know your infrastructure — it helps you notice when it behaves differently.
+Augurd assumes you know your infrastructure — it helps you notice when it behaves differently.
 
 ---
 
@@ -41,7 +41,7 @@ Most log monitoring tools fall into two categories:
 - **Too heavy** — complex pipelines, high setup cost, overkill for small/medium environments
 - **Too naive** — simple alerting with no context, resulting in constant noise
 
-augurd sits in between: lightweight to deploy, aware enough to filter noise, flexible enough to adapt per server.
+Augurd sits in between: lightweight to deploy, aware enough to filter noise, flexible enough to adapt per server.
 
 There are plenty of existing solutions, but I wanted something tailored to my own servers and the servers I manage. This is the result of that work.
 
@@ -57,7 +57,7 @@ A few things to keep in mind:
 
 ## Core idea
 
-Instead of rules first, augurd is built around:
+Instead of rules first, Augurd is built around:
 
 > "Let the model classify the event, then constrain it with context."
 
@@ -85,13 +85,13 @@ Each server can have its own model, its own prompt, and its own noise profile. T
 ## Design principles
 
 **Local-first by default**
-Logs may contain sensitive operational data. augurd requires no external API calls and no data leaves your network during analysis.
+Logs may contain sensitive operational data. Augurd requires no external API calls and no data leaves your network during analysis.
 
 **Signal over volume**
 The goal is fewer, more meaningful alerts — not complete visibility.
 
 **Works with real-world setups**
-SSH over Cloudflare Tunnel, mixed log sources, imperfect configs. augurd is designed for how systems actually look, not how they "should" look.
+SSH over Cloudflare Tunnel, mixed log sources, imperfect configs. Augurd is designed for how systems actually look, not how they "should" look.
 
 ---
 
@@ -120,11 +120,11 @@ Open `http://localhost:8000` and:
 1. **Settings** — set your Ollama URL and pick a model. Optionally paste a Discord webhook URL if you want alerts sent to Discord
 2. **Add Server** — fill in SSH connection details, use "Test Connection" to verify before saving
 3. **Add log sources** — `journalctl` unit name (e.g. `sshd.service`), `*` for all system logs, or a file path
-4. **Start Worker** — augurd SSHes in and begins monitoring; it will auto-restart on app restart
+4. **Start Worker** — Augurd SSHes in and begins monitoring; it will auto-restart on app restart
 
 ### Ollama
 
-Ollama must be reachable from the machine running augurd. By default it only listens on `127.0.0.1` — to expose it on your network:
+Ollama must be reachable from the machine running Augurd. By default it only listens on `127.0.0.1` — to expose it on your network:
 
 ```bash
 # Temporarily
@@ -139,7 +139,7 @@ sudo systemctl edit ollama
 
 ### Reverse proxy (required for external access)
 
-augurd has **no built-in authentication**. Do not expose it directly to the internet. Place it behind [Caddy](https://caddyserver.com), [Nginx Proxy Manager](https://nginxproxymanager.com), or Cloudflare Access.
+Augurd has **no built-in authentication**. Do not expose it directly to the internet. Place it behind [Caddy](https://caddyserver.com), [Nginx Proxy Manager](https://nginxproxymanager.com), or Cloudflare Access.
 
 ---
 
@@ -169,7 +169,7 @@ Supports arbitrary proxy commands using `%h` (hostname) and `%p` (port) placehol
 cloudflared access ssh --hostname %h
 ```
 
-When the proxy command outputs a browser authentication URL, augurd surfaces it as a clickable link in the UI.
+When the proxy command outputs a browser authentication URL, Augurd surfaces it as a clickable link in the UI.
 
 ### Blacklist
 
@@ -199,7 +199,7 @@ DHCP lease renewals, and NetworkManager connectivity checks.
 
 ## Why local inference (Ollama)
 
-augurd is built around local models because:
+Augurd is built around local models because:
 
 - logs contain sensitive operational data — none of it leaves your network
 - continuous streaming generates high request volume, making external APIs costly
@@ -213,7 +213,7 @@ Support for external providers may be added at some point, but local-first is th
 
 > **Read this before deploying, especially outside a trusted network.**
 
-augurd is an early-stage project and is **not secure by default**. It assumes a controlled environment and an operator who understands the risks.
+Augurd is an early-stage project and is **not secure by default**. It assumes a controlled environment and an operator who understands the risks.
 
 ### Implemented protections
 
@@ -229,7 +229,7 @@ You can clear a stored fingerprint from the server settings page when a key legi
 **No web UI authentication**
 The web interface has no built-in login. Anyone who can access the UI can view all server configs, read stored credentials, start/stop workers, and modify settings.
 
-👉 You **must** place augurd behind an authenticated reverse proxy.
+👉 You **must** place Augurd behind an authenticated reverse proxy.
 
 ---
 
@@ -275,7 +275,7 @@ cat /etc/ssh/ssh_host_*.pub
 
 ### Recommended deployment
 
-- Run augurd on a trusted internal network only
+- Run Augurd on a trusted internal network only
 - Place it behind a reverse proxy with authentication (Caddy, NPM, or Cloudflare Access)
 - Restrict database permissions: `chmod 600 augurd.db`
 - Prefer SSH key authentication over passwords
@@ -288,7 +288,7 @@ Planned improvements:
 - CSRF protection
 - Improved alert sanitisation before external dispatch
 
-Until then, treat augurd as a **trusted-network tool**, not an internet-facing service.
+Until then, treat Augurd as a **trusted-network tool**, not an internet-facing service.
 
 ---
 
