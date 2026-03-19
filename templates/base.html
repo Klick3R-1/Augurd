@@ -12,7 +12,7 @@
   <nav>
     <div style="display:flex; flex-direction:column; gap:0.25rem;">
       <div style="display:flex; align-items:center; gap:0.75rem;">
-        <a class="brand" href="/">&#9656; augurd</a>
+        <a class="brand" href="/">&#9656; Augurd</a>
         <span class="brand-sub">AI-powered log monitor</span>
         {% set new_ver, new_url = update_available() %}
         {% if new_ver %}
@@ -34,5 +34,9 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+  <footer style="text-align:center; padding:1.5rem 0; font-size:0.75rem; color:var(--aug-muted);">
+    &copy; 2026 Augurd &mdash;
+    <a href="https://github.com/Klick3R-1/Augurd" target="_blank" rel="noopener" style="color:var(--aug-muted);">GitHub</a>
+  </footer>
 </body>
 </html>
